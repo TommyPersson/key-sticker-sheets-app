@@ -130,6 +130,8 @@ interface InteractiveProps {
   stickers: Record<string, Sticker>;
   /** Selected sheet item id */
   selectedId: string | null;
+  /** Library sticker whose placements are highlighted */
+  highlightStickerId?: string | null;
   onSelect: (itemId: string) => void;
   onAppend: () => void;
   onMove: (from: number, to: number) => void;
@@ -144,6 +146,7 @@ export function StickerSheetEditor({
   sheet,
   stickers,
   selectedId,
+  highlightStickerId,
   onSelect,
   onAppend,
   onMove,
@@ -177,6 +180,7 @@ export function StickerSheetEditor({
             const classes = ['ks-item', slot.kind === 'sticker' ? 'filled' : 'empty'];
             if (slot.kind === 'sticker') {
               if (slot.item.id === selectedId) classes.push('selected');
+              if (slot.item.stickerId === highlightStickerId) classes.push('highlighted');
               if (slot.index === dragIndex) classes.push('dragging');
               const s = slot.sticker;
               if (!s.line1 && !s.line2 && !s.shortcut && !s.icon) classes.push('placeholder-text');

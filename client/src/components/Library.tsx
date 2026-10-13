@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Box, Button, Chip, InputAdornment, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Chip, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import { StickerFace, LIBRARY_DRAG_TYPE, sheetCssVars } from './StickerSheet';
@@ -126,51 +126,46 @@ export function Library({
           const placed = onSheet.get(sticker.id) ?? 0;
           const sheets = sheetCount(sticker.id);
           return (
-            <Tooltip
+            <Box
               key={sticker.id}
-              enterDelay={700}
-              title={sheets === 0 ? 'Not used on any sheet' : `Used on ${sheets} sheet${sheets === 1 ? '' : 's'}`}
+              draggable={hasSheet}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData(LIBRARY_DRAG_TYPE, sticker.id);
+                e.dataTransfer.setData('text/plain', [sticker.line1, sticker.line2].filter(Boolean).join(' '));
+              }}
+              onClick={() => onSelect(sticker.id)}
+              onDoubleClick={() => hasSheet && onAddToSheet(sticker.id)}
+              sx={{
+                position: 'relative',
+                display: 'grid',
+                placeItems: 'center',
+                p: 0.5,
+                borderRadius: 1,
+                border: 1,
+                borderColor: sticker.id === selectedId ? 'primary.main' : 'divider',
+                bgcolor: sticker.id === selectedId ? 'action.selected' : 'background.paper',
+                cursor: hasSheet ? 'grab' : 'pointer',
+                opacity: sheets === 0 ? 0.75 : 1,
+                '&:hover': { borderColor: 'primary.light' },
+              }}
             >
-              <Box
-                draggable={hasSheet}
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = 'copy';
-                  e.dataTransfer.setData(LIBRARY_DRAG_TYPE, sticker.id);
-                  e.dataTransfer.setData('text/plain', [sticker.line1, sticker.line2].filter(Boolean).join(' '));
-                }}
-                onClick={() => onSelect(sticker.id)}
-                onDoubleClick={() => hasSheet && onAddToSheet(sticker.id)}
-                sx={{
-                  position: 'relative',
-                  display: 'grid',
-                  placeItems: 'center',
-                  p: 0.5,
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: sticker.id === selectedId ? 'primary.main' : 'divider',
-                  bgcolor: sticker.id === selectedId ? 'action.selected' : 'background.paper',
-                  cursor: hasSheet ? 'grab' : 'pointer',
-                  opacity: sheets === 0 ? 0.75 : 1,
-                  '&:hover': { borderColor: 'primary.light' },
-                }}
-              >
-                <Box sx={{ zoom, bgcolor: '#fff', color: '#000', pointerEvents: 'none' }}>
-                  <div className="ks-page" style={sheetCssVars(dimensions)}>
-                    <div className="ks-item">
-                      <StickerFace sticker={sticker} />
-                    </div>
+              <Box sx={{ zoom, bgcolor: '#fff', color: '#000', pointerEvents: 'none' }}>
+                <div className="ks-page" style={sheetCssVars(dimensions)}>
+                  <div className="ks-item">
+                    <StickerFace sticker={sticker} />
                   </div>
-                </Box>
-                {placed > 0 && (
-                  <Chip
-                    size="small"
-                    color="success"
-                    label={placed > 1 ? `×${placed}` : '✓'}
-                    sx={{ position: 'absolute', bottom: 2, right: 2, height: 16, fontSize: 10, '& .MuiChip-label': { px: 0.6 } }}
-                  />
-                )}
+                </div>
               </Box>
-            </Tooltip>
+              {placed > 0 && (
+                <Chip
+                  size="small"
+                  color="success"
+                  label={placed > 1 ? `×${placed}` : '✓'}
+                  sx={{ position: 'absolute', bottom: 2, right: 2, height: 16, fontSize: 10, '& .MuiChip-label': { px: 0.6 } }}
+                />
+              )}
+            </Box>
           );
         })}
         {list.length === 0 && (

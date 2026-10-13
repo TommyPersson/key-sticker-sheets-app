@@ -24,6 +24,7 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import GridViewIcon from '@mui/icons-material/GridView';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
@@ -31,8 +32,9 @@ import CloudOffIcon from '@mui/icons-material/CloudOff';
 import { api } from './api';
 import { SheetList } from './components/SheetList';
 import { Library } from './components/Library';
-import { FloatingPane, paneClearance } from './components/FloatingPane';
-import { StickerEditor, type PlacementActions } from './components/StickerEditor';
+import { FloatingColumn, FloatingPane, paneClearance } from './components/FloatingPane';
+import { StickerEditor } from './components/StickerEditor';
+import { SheetPlacement, type PlacementActions } from './components/SheetPlacement';
 import { IconPicker } from './components/IconPicker';
 import { StickerSheetEditor, StickerSheetPrint, perPage } from './components/StickerSheet';
 import { PageSetup } from './components/PageSetup';
@@ -42,7 +44,8 @@ import { useWorkspace, type SaveStatus } from './useWorkspace';
 import type { IconInfo, LibrarySticker, Sheet, SheetItem, SheetSummary, Sticker } from './types';
 
 const SHEETS_WIDTH = 260;
-const LIBRARY_WIDTH = 290;
+/** Fits three columns of library cards, including the scrollbar */
+const LIBRARY_WIDTH = 400;
 const EDITOR_WIDTH = 340;
 /** Space between the editor and the library pane (px) */
 const EDITOR_GAP = 12;
@@ -84,6 +87,8 @@ export default function App() {
   const [stickerRefs, setStickerRefs] = useState<Record<string, string[]>>({});
   const [icons, setIcons] = useState<IconInfo[]>([]);
   const [selection, setSelection] = useState<Selection>(null);
+  /** Library sticker whose placements are highlighted on the sheet */
+  const [highlightStickerId, setHighlightStickerId] = useState<string | null>(null);
   const [sheetsOpen, setSheetsOpen] = useState(() => stored('ks-sheets-pane', 'open') === 'open');
   const [libraryOpen, setLibraryOpen] = useState(() => stored('ks-library', 'open') === 'open');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -162,6 +167,9 @@ export default function App() {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The highlight button may unmount without a mouse-leave (e.g. when the selection changes)
+  useEffect(() => setHighlightStickerId(null), [selection]);
 
   // Follow sheet links and back/forward navigation
   useEffect(() => {
@@ -518,6 +526,7 @@ export default function App() {
                       sheet={sheet}
                       stickers={stickers}
                       selectedId={selectedItem?.id ?? null}
+                      highlightStickerId={highlightStickerId}
                       onSelect={(id) => setSelection({ kind: 'item', id })}
                       onAppend={() => createSticker(items.length)}
                       onMove={moveItem}
@@ -618,39 +627,68 @@ export default function App() {
                 onAddToSheet={(id) => place(id, items.length)}
               />
             </FloatingPane>
-            <FloatingPane
-              title={placement ? `Sticker ${placement.index + 1} of ${placement.count}` : 'Library sticker'}
-              icon={<EditIcon />}
-              side="right"
-              width={EDITOR_WIDTH}
-              // Next to the library, or below its button when it's minimized
-              offset={libraryOpen ? LIBRARY_WIDTH + EDITOR_GAP : 0}
-              topOffset={libraryOpen ? 0 : MINIMIZED_PANE_HEIGHT + EDITOR_GAP}
-              open={!!selectedSticker}
-              onOpenChange={(open) => !open && setSelection(null)}
-              dismiss="close"
-              fitContent
-            >
-              {selectedSticker && (
-                <Box sx={{ p: 2 }}>
-                  <StickerEditor
-                    key={selection?.id}
-                    sticker={selectedSticker}
-                    dimensions={dimensions}
-                    usedOn={usedOnIds(selectedSticker.id).map(sheetName)}
-                    placement={placement}
-                    onAddToSheet={
-                      selection?.kind === 'sticker' && sheet ? () => place(selectedSticker.id, items.length) : undefined
-                    }
-                    onChange={(patch) =>
-                      updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)
-                    }
-                    onChooseIcon={() => setPickerOpen(true)}
-                    onDeleteFromLibrary={() => deleteFromLibrary(selectedSticker.id)}
-                  />
-                </Box>
-              )}
-            </FloatingPane>
+            {selectedSticker && (
+              <FloatingColumn
+                side="right"
+                width={EDITOR_WIDTH}
+                // Next to the library, or below its button when it's minimized
+                offset={libraryOpen ? LIBRARY_WIDTH + EDITOR_GAP : 0}
+                topOffset={libraryOpen ? 0 : MINIMIZED_PANE_HEIGHT + EDITOR_GAP}
+              >
+                <FloatingPane
+                  inline
+                  title="Edit sticker"
+                  icon={<EditIcon />}
+                  side="right"
+                  width={EDITOR_WIDTH}
+                  open
+                  onOpenChange={(open) => !open && setSelection(null)}
+                  dismiss="close"
+                  fitContent
+                >
+                  <Box sx={{ p: 2 }}>
+                    <StickerEditor
+                      key={selectedSticker.id}
+                      sticker={selectedSticker}
+                      dimensions={dimensions}
+                      usedOn={usedOnIds(selectedSticker.id).map(sheetName)}
+                      onChange={(patch) =>
+                        updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)
+                      }
+                      onChooseIcon={() => setPickerOpen(true)}
+                      onDeleteFromLibrary={() => deleteFromLibrary(selectedSticker.id)}
+                    />
+                  </Box>
+                </FloatingPane>
+                {sheet && (
+                  <FloatingPane
+                    inline
+                    title="On this sheet"
+                    icon={<GridViewIcon />}
+                    side="right"
+                    width={EDITOR_WIDTH}
+                    open
+                    dismiss="none"
+                    fitContent
+                  >
+                    <Box sx={{ px: 2, py: 1.5 }}>
+                      <SheetPlacement
+                        placement={placement}
+                        library={
+                          selection?.kind === 'sticker'
+                            ? {
+                                placedCount: onSheet.get(selectedSticker.id) ?? 0,
+                                onAddToSheet: () => place(selectedSticker.id, items.length),
+                                onHighlight: (on) => setHighlightStickerId(on ? selectedSticker.id : null),
+                              }
+                            : undefined
+                        }
+                      />
+                    </Box>
+                  </FloatingPane>
+                )}
+              </FloatingColumn>
+            )}
           </Box>
           {sheet && <StickerSheetPrint sheet={sheet} stickers={stickers} />}
         </Box>
@@ -694,6 +732,13 @@ const onBlue = {
   '& .MuiInput-underline:after': { borderBottomColor: 'common.white' },
   '& .MuiIconButton-root.Mui-disabled': { color: 'rgba(255, 255, 255, 0.35)' },
   '& .MuiDivider-root': { borderColor: 'rgba(255, 255, 255, 0.3)' },
+  '& .MuiToggleButton-root': {
+    color: 'rgba(255, 255, 255, 0.7)',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    py: 0.5,
+    '&.Mui-selected, &.Mui-selected:hover': { color: 'common.white', bgcolor: 'rgba(255, 255, 255, 0.2)' },
+    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' },
+  },
 } as const;
 
 function SaveIndicator({ status }: { status: SaveStatus }) {

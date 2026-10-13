@@ -12,6 +12,7 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ArticleIcon from '@mui/icons-material/Article';
@@ -72,6 +73,26 @@ export function PageSetup({ settings, onChange }: Props) {
     onChange({ ...patch, skip: Math.min(settings.skip, capacity - 1) }, coalesceKey);
   };
 
+  const orientationToggle = (
+    <ToggleButtonGroup
+      size="small"
+      exclusive
+      value={settings.landscape ? 'landscape' : 'portrait'}
+      onChange={(_, v) => v && setLayout({ landscape: v === 'landscape' })}
+    >
+      <Tooltip title="Portrait">
+        <ToggleButton value="portrait" aria-label="Portrait">
+          <CropPortraitIcon fontSize="small" />
+        </ToggleButton>
+      </Tooltip>
+      <Tooltip title="Landscape">
+        <ToggleButton value="landscape" aria-label="Landscape">
+          <CropLandscapeIcon fontSize="small" />
+        </ToggleButton>
+      </Tooltip>
+    </ToggleButtonGroup>
+  );
+
   const setDimension = (key: keyof SheetDimensions, value: number) =>
     setLayout({ dimensions: { ...dimensions, [key]: value } }, `dimensions.${key}`);
 
@@ -83,8 +104,10 @@ export function PageSetup({ settings, onChange }: Props) {
         onClick={(e) => setAnchor(e.currentTarget)}
         sx={{ textTransform: 'none' }}
       >
-        {settings.paper} {settings.landscape ? 'landscape' : 'portrait'} · {grid.columns}×{grid.rows}
+        {settings.paper} · {grid.columns}×{grid.rows}
       </Button>
+      {/* Also shown directly in the toolbar for quick switching */}
+      {orientationToggle}
       <Popover
         open={!!anchor}
         anchorEl={anchor}
@@ -109,19 +132,7 @@ export function PageSetup({ settings, onChange }: Props) {
                 </MenuItem>
               ))}
             </TextField>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={settings.landscape ? 'landscape' : 'portrait'}
-              onChange={(_, v) => v && setLayout({ landscape: v === 'landscape' })}
-            >
-              <ToggleButton value="portrait" aria-label="Portrait">
-                <CropPortraitIcon fontSize="small" />
-              </ToggleButton>
-              <ToggleButton value="landscape" aria-label="Landscape">
-                <CropLandscapeIcon fontSize="small" />
-              </ToggleButton>
-            </ToggleButtonGroup>
+            {orientationToggle}
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: '8px !important' }}>
             Fits {grid.columns} × {grid.rows} = {grid.perPage} stickers per page

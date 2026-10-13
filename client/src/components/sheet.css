@@ -148,6 +148,12 @@
   background: #eaf2fc;
 }
 
+.ks-interactive .ks-item.highlighted {
+  outline: 0.8mm solid #ff9800;
+  outline-offset: 0.3mm;
+  background: #fff3e0;
+}
+
 .ks-interactive .ks-item.skipped {
   cursor: default;
   background: repeating-linear-gradient(45deg, #f1f1f1, #f1f1f1 1.5mm, #fafafa 1.5mm, #fafafa 3mm);
