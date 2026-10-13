@@ -66,7 +66,8 @@ export class Storage {
 
   async getSheet(id) {
     try {
-      return JSON.parse(await fs.readFile(this.sheetFile(id), 'utf8'));
+      // Normalizing fills in settings added after the file was written
+      return normalizeSheet(JSON.parse(await fs.readFile(this.sheetFile(id), 'utf8')));
     } catch (e) {
       if (e.code === 'ENOENT') throw new NotFoundError(`Sheet ${id} not found`);
       throw e;
@@ -162,10 +163,7 @@ function normalizeSheet(input) {
     name: str(input.name, 100).trim() || 'Untitled sheet',
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
-    settings: {
-      skip: Math.max(0, Math.min(49, Number.parseInt(settings.skip, 10) || 0)),
-      outlines: Boolean(settings.outlines),
-    },
+    settings: normalizeSettings(settings),
     stickers: stickers.map((s) => ({
       id: ID_PATTERN.test(s?.id ?? '') ? s.id : crypto.randomUUID(),
       line1: str(s?.line1),
@@ -173,6 +171,45 @@ function normalizeSheet(input) {
       shortcut: str(s?.shortcut),
       icon: str(s?.icon, 300),
     })),
+  };
+}
+
+const PAPER_SIZES = new Set(['A4', 'A5', 'A3', 'Letter', 'Legal']);
+
+function clampInt(value, min, max, fallback) {
+  const n = Number.parseInt(value, 10);
+  return Number.isNaN(n) ? fallback : Math.max(min, Math.min(max, n));
+}
+
+// Defaults (mm) and limits, keep in sync with DEFAULT_DIMENSIONS/DIMENSION_LIMITS in client/src/paper.ts
+const DIMENSIONS = {
+  cellWidth: [26, 5, 200],
+  cellHeight: [17, 5, 200],
+  gapX: [2, 0, 50],
+  gapY: [2, 0, 50],
+  pageMargin: [10, 0, 50],
+  sheetPadding: [10, 0, 50],
+  markerInset: [5, 0, 50],
+  markerSize: [10, 0, 50],
+};
+
+function normalizeDimensions(input) {
+  const dimensions = {};
+  for (const [key, [fallback, min, max]] of Object.entries(DIMENSIONS)) {
+    const n = Number(input?.[key]);
+    dimensions[key] = Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n * 100) / 100)) : fallback;
+  }
+  return dimensions;
+}
+
+function normalizeSettings(settings) {
+  return {
+    dimensions: normalizeDimensions(settings.dimensions),
+    paper: PAPER_SIZES.has(settings.paper) ? settings.paper : 'A4',
+    landscape: Boolean(settings.landscape),
+    // The page capacity depends on the paper and is enforced by the client
+    skip: clampInt(settings.skip, 0, 999, 0),
+    outlines: Boolean(settings.outlines),
   };
 }
 

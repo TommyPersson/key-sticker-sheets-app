@@ -1,4 +1,4 @@
-import type { Sheet, Sticker } from './types';
+import type { Sheet, SheetSettings, Sticker } from './types';
 
 const text = (v: unknown) => (typeof v === 'string' ? v : '');
 
@@ -28,7 +28,8 @@ export function parseImport(json: string, fallbackName: string): Partial<Sheet> 
 
   return {
     name: text(data?.name) || fallbackName,
-    settings: { skip: Number(data?.settings?.skip) || 0, outlines: Boolean(data?.settings?.outlines) },
+    // Passed through as-is; the server validates settings and fills in defaults
+    settings: { ...data?.settings } as SheetSettings,
     stickers,
   };
 }

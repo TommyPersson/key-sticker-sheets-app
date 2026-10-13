@@ -2,9 +2,24 @@
  * Physical sticker sheet layout, carried over 1:1 from the PoC (test.html).
  * All measurements are in real-world units so the printed output keeps its scale.
  */
+
+/* A sheet of paper; size and margin are set inline from the sheet's paper settings */
+.ks-paper {
+  box-sizing: border-box;
+  position: relative;
+  background: #fff;
+  overflow: hidden;
+}
+
 .ks-page {
+  /* Defaults for standalone use (sticker preview); sheets set these from their dimensions settings */
   --cell-width: 26mm;
   --cell-height: 17mm;
+  --gap-x: 2mm;
+  --gap-y: 2mm;
+  --sheet-padding: 10mm;
+  --marker-inset: 5mm;
+  --marker-size: 10mm;
   position: relative;
   width: fit-content;
   background: #fff;
@@ -13,21 +28,21 @@
 
 .ks-marker {
   position: absolute;
-  height: 1cm;
-  width: 1cm;
+  height: var(--marker-size);
+  width: var(--marker-size);
   pointer-events: none;
 }
 
 .ks-marker.top-left {
-  top: 0.5cm;
-  left: 0.5cm;
+  top: var(--marker-inset);
+  left: var(--marker-inset);
   border-left: 1px solid black;
   border-top: 1px solid black;
 }
 
 .ks-marker.bottom-right {
-  bottom: 0.5cm;
-  right: 0.5cm;
+  bottom: var(--marker-inset);
+  right: var(--marker-inset);
   border-right: 1px solid black;
   border-bottom: 1px solid black;
 }
@@ -35,11 +50,11 @@
 .ks-grid {
   font-family: 'Segoe UI', 'Selawik', 'Open Sans', Roboto, Arial, sans-serif;
   display: grid;
-  padding: 1cm;
-  grid-template-columns: repeat(5, var(--cell-width));
-  grid-template-rows: repeat(10, var(--cell-height));
-  row-gap: 2mm;
-  column-gap: 2mm;
+  padding: var(--sheet-padding);
+  grid-template-columns: repeat(var(--columns, 5), var(--cell-width));
+  grid-template-rows: repeat(var(--rows, 10), var(--cell-height));
+  row-gap: var(--gap-y);
+  column-gap: var(--gap-x);
   width: fit-content;
 }
 
@@ -89,6 +104,26 @@
   top: 2mm;
   max-width: 16px;
   max-height: 16px;
+}
+
+/* Dimensions line in the bottom page margin (left/right set inline to the page margin) */
+.ks-page-info {
+  position: absolute;
+  bottom: 4mm; /* stays clear of most printers' unprintable edge */
+  display: flex;
+  flex-direction: column;
+  gap: 0.3mm;
+  font-family: 'Segoe UI', 'Selawik', 'Open Sans', Roboto, Arial, sans-serif;
+  font-size: 5.5pt;
+  line-height: 1.15;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ks-page-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- Editor-only affordances (never printed) ---------- */
@@ -163,11 +198,11 @@
     display: block;
   }
 
-  .ks-print-root .ks-page {
+  .ks-print-root .ks-paper {
     break-after: page;
   }
 
-  .ks-print-root .ks-page:last-child {
+  .ks-print-root .ks-paper:last-of-type {
     break-after: auto;
   }
 

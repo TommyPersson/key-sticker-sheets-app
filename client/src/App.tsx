@@ -7,12 +7,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
-  FormControlLabel,
   IconButton,
   Paper,
   Snackbar,
   Stack,
-  Switch,
   TextField,
   Toolbar,
   Tooltip,
@@ -31,7 +29,9 @@ import { api } from './api';
 import { SheetList } from './components/SheetList';
 import { StickerEditor } from './components/StickerEditor';
 import { IconPicker } from './components/IconPicker';
-import { PER_PAGE, StickerSheetEditor, StickerSheetPrint } from './components/StickerSheet';
+import { StickerSheetEditor, StickerSheetPrint, perPage } from './components/StickerSheet';
+import { PageSetup } from './components/PageSetup';
+import { dimensionsOf, gridFor } from './paper';
 import { parseImport } from './importExport';
 import { useSheetEditor, type SaveStatus } from './useSheetEditor';
 import type { IconInfo, Sheet, SheetSummary, Sticker } from './types';
@@ -173,7 +173,7 @@ export default function App() {
         e.preventDefault();
         editor.flush();
       } else if (!typing && !pickerOpen && selected) {
-        const cols = 5;
+        const cols = sheet ? gridFor(sheet.settings).columns : 5;
         const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols };
         if (e.key in moves) {
           e.preventDefault();
@@ -249,7 +249,7 @@ export default function App() {
 
   // ---------- Render ----------
 
-  const pageCount = sheet ? Math.max(1, Math.ceil((sheet.settings.skip + stickers.length) / PER_PAGE)) : 0;
+  const pageCount = sheet ? Math.max(1, Math.ceil((sheet.settings.skip + stickers.length) / perPage(sheet.settings))) : 0;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -316,28 +316,9 @@ export default function App() {
                   </span>
                 </Tooltip>
                 <Divider orientation="vertical" flexItem />
-                <Tooltip title="Slots to leave empty at the start of the first page, for partially used sticker paper">
-                  <TextField
-                    label="Skip slots"
-                    type="number"
-                    size="small"
-                    value={sheet.settings.skip}
-                    onChange={(e) => {
-                      const skip = Math.max(0, Math.min(PER_PAGE - 1, Number.parseInt(e.target.value, 10) || 0));
-                      edit((s) => ({ ...s, settings: { ...s.settings, skip } }), 'skip');
-                    }}
-                    slotProps={{ htmlInput: { min: 0, max: PER_PAGE - 1 } }}
-                    sx={{ width: 100 }}
-                  />
-                </Tooltip>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={sheet.settings.outlines}
-                      onChange={(e) => edit((s) => ({ ...s, settings: { ...s.settings, outlines: e.target.checked } }))}
-                    />
-                  }
-                  label="Outlines"
+                <PageSetup
+                  settings={sheet.settings}
+                  onChange={(patch, key) => edit((s) => ({ ...s, settings: { ...s.settings, ...patch } }), key)}
                 />
                 <Divider orientation="vertical" flexItem />
                 <Stack direction="row" sx={{ alignItems: 'center' }}>
@@ -367,7 +348,7 @@ export default function App() {
                   {stickers.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit,
                   drag to reorder
                 </Typography>
-                <Stack spacing={3} sx={{ zoom, width: 'fit-content', mx: 'auto', '& .ks-page': { boxShadow: 2 } }}>
+                <Stack spacing={3} sx={{ zoom, width: 'fit-content', mx: 'auto' }}>
                   <StickerSheetEditor
                     sheet={sheet}
                     selectedId={selectedStickerId}
@@ -389,6 +370,7 @@ export default function App() {
                 <StickerEditor
                   key={selected.id}
                   sticker={selected}
+                  dimensions={dimensionsOf(sheet.settings)}
                   index={selectedIndex}
                   count={stickers.length}
                   onChange={(patch) =>

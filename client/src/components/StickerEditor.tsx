@@ -4,11 +4,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ImageIcon from '@mui/icons-material/Image';
-import { StickerFace } from './StickerSheet';
-import type { Sticker } from '../types';
+import { StickerFace, sheetCssVars } from './StickerSheet';
+import type { SheetDimensions, Sticker } from '../types';
 
 interface Props {
   sticker: Sticker;
+  dimensions: SheetDimensions;
   index: number;
   count: number;
   onChange: (patch: Partial<Sticker>) => void;
@@ -18,7 +19,22 @@ interface Props {
   onMove: (delta: number) => void;
 }
 
-export function StickerEditor({ sticker, index, count, onChange, onChooseIcon, onDuplicate, onDelete, onMove }: Props) {
+const PX_PER_MM = 96 / 25.4;
+/** Widest the preview may get inside the side panel, in px */
+const PREVIEW_MAX_WIDTH = 290;
+
+export function StickerEditor({
+  sticker,
+  dimensions,
+  index,
+  count,
+  onChange,
+  onChooseIcon,
+  onDuplicate,
+  onDelete,
+  onMove,
+}: Props) {
+  const previewZoom = Math.min(2, PREVIEW_MAX_WIDTH / (dimensions.cellWidth * PX_PER_MM));
   const field = (key: 'line1' | 'line2' | 'shortcut', label: string, helper?: string) => (
     <TextField
       label={label}
@@ -36,10 +52,10 @@ export function StickerEditor({ sticker, index, count, onChange, onChooseIcon, o
         Sticker {index + 1} of {count}
       </Typography>
 
-      {/* Live preview at roughly 2x physical size */}
+      {/* Live preview at up to 2x physical size */}
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-        <Paper variant="outlined" sx={{ zoom: 2, bgcolor: '#fff', color: '#000' }}>
-          <div className="ks-page">
+        <Paper variant="outlined" sx={{ zoom: previewZoom, bgcolor: '#fff', color: '#000' }}>
+          <div className="ks-page" style={sheetCssVars(dimensions)}>
             <div className="ks-item">
               <StickerFace sticker={sticker} />
             </div>
