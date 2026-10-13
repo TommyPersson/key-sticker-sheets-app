@@ -2,18 +2,28 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { iconUrl } from '../api';
 import { dimensionsOf, gridFor, mm, paperSize } from '../paper';
-import type { Sheet, SheetDimensions, SheetSettings, Sticker } from '../types';
+import type { Sheet, SheetDimensions, SheetItem, SheetSettings, Sticker } from '../types';
 import './sheet.css';
 
 export const perPage = (settings: SheetSettings) => gridFor(settings).perPage;
 
-type Slot = { kind: 'skipped' } | { kind: 'sticker'; sticker: Sticker; index: number } | { kind: 'empty' };
+/** Drag data type used when dragging a sticker out of the library */
+export const LIBRARY_DRAG_TYPE = 'application/x-library-sticker';
+
+const MISSING: Sticker = { id: '', line1: '?', line2: 'MISSING', shortcut: '', icon: '' };
+
+type Slot =
+  | { kind: 'skipped' }
+  | { kind: 'sticker'; item: SheetItem; sticker: Sticker; index: number }
+  | { kind: 'empty' };
 
 /** Lays the stickers out on as many pages as needed, honouring the skip offset on the first page. */
-export function paginate(sheet: Sheet): Slot[][] {
+export function paginate(sheet: Sheet, stickers: Record<string, Sticker>): Slot[][] {
   const slots: Slot[] = [
     ...Array.from({ length: sheet.settings.skip }, (): Slot => ({ kind: 'skipped' })),
-    ...sheet.stickers.map((sticker, index): Slot => ({ kind: 'sticker', sticker, index })),
+    ...sheet.items.map(
+      (item, index): Slot => ({ kind: 'sticker', item, sticker: stickers[item.stickerId] ?? MISSING, index }),
+    ),
   ];
   const size = perPage(sheet.settings);
   const pageCount = Math.max(1, Math.ceil(slots.length / size));
@@ -117,23 +127,37 @@ export function StickerFace({ sticker, placeholder }: { sticker: Sticker; placeh
 
 interface InteractiveProps {
   sheet: Sheet;
+  stickers: Record<string, Sticker>;
+  /** Selected sheet item id */
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (itemId: string) => void;
   onAppend: () => void;
   onMove: (from: number, to: number) => void;
+  /** A library sticker was dropped: insert it at this index */
+  onInsert: (stickerId: string, index: number) => void;
 }
 
+type Drop = { slot: number; mode: 'move' | 'insert' } | null;
+
 /** On-screen, editable rendering of the sheet. */
-export function StickerSheetEditor({ sheet, selectedId, onSelect, onAppend, onMove }: InteractiveProps) {
+export function StickerSheetEditor({
+  sheet,
+  stickers,
+  selectedId,
+  onSelect,
+  onAppend,
+  onMove,
+  onInsert,
+}: InteractiveProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
-  const pages = paginate(sheet);
+  const [drop, setDrop] = useState<Drop>(null);
+  const pages = paginate(sheet, stickers);
   const size = perPage(sheet.settings);
-  const lastIndex = sheet.stickers.length - 1;
+  const count = sheet.items.length;
 
   const endDrag = () => {
     setDragIndex(null);
-    setDropIndex(null);
+    setDrop(null);
   };
 
   return (
@@ -141,50 +165,67 @@ export function StickerSheetEditor({ sheet, selectedId, onSelect, onAppend, onMo
       {pages.map((slots, pageIndex) => (
         <Paper key={pageIndex} sheet={sheet} page={pageIndex + 1} pageCount={pages.length} interactive>
           {slots.map((slot, i) => {
-              const key = slot.kind === 'sticker' ? slot.sticker.id : `${pageIndex}-${i}`;
-              if (slot.kind === 'skipped') {
-                return <div key={key} className="ks-item skipped" title="Skipped (already used) slot" />;
-              }
-              // Dropping on an empty slot moves the sticker to the end
-              const target = slot.kind === 'sticker' ? slot.index : lastIndex;
-              const classes = ['ks-item', slot.kind === 'sticker' ? 'filled' : 'empty'];
-              if (slot.kind === 'sticker') {
-                if (slot.sticker.id === selectedId) classes.push('selected');
-                if (slot.index === dragIndex) classes.push('dragging');
-                const s = slot.sticker;
-                if (!s.line1 && !s.line2 && !s.shortcut && !s.icon) classes.push('placeholder-text');
-              }
-              if (dragIndex !== null && dropIndex === i + pageIndex * size && target !== dragIndex) {
-                classes.push('drop-target');
-              }
-              return (
-                <div
-                  key={key}
-                  className={classes.join(' ')}
-                  draggable={slot.kind === 'sticker'}
-                  onClick={() => (slot.kind === 'sticker' ? onSelect(slot.sticker.id) : onAppend())}
-                  title={slot.kind === 'empty' ? 'Add sticker' : undefined}
-                  onDragStart={(e) => {
-                    if (slot.kind !== 'sticker') return;
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', slot.sticker.id);
-                    setDragIndex(slot.index);
-                  }}
-                  onDragOver={(e) => {
-                    if (dragIndex === null) return;
+            const slotNumber = i + pageIndex * size;
+            const key = slot.kind === 'sticker' ? slot.item.id : `${pageIndex}-${i}`;
+            if (slot.kind === 'skipped') {
+              return <div key={key} className="ks-item skipped" title="Skipped (already used) slot" />;
+            }
+            // Moving onto an empty slot moves to the end; inserting there appends
+            const moveTarget = slot.kind === 'sticker' ? slot.index : count - 1;
+            const insertTarget = slot.kind === 'sticker' ? slot.index : count;
+
+            const classes = ['ks-item', slot.kind === 'sticker' ? 'filled' : 'empty'];
+            if (slot.kind === 'sticker') {
+              if (slot.item.id === selectedId) classes.push('selected');
+              if (slot.index === dragIndex) classes.push('dragging');
+              const s = slot.sticker;
+              if (!s.line1 && !s.line2 && !s.shortcut && !s.icon) classes.push('placeholder-text');
+            }
+            if (drop?.slot === slotNumber) {
+              if (drop.mode === 'insert') classes.push(slot.kind === 'sticker' ? 'insert-before' : 'drop-target');
+              else if (moveTarget !== dragIndex) classes.push('drop-target');
+            }
+
+            return (
+              <div
+                key={key}
+                className={classes.join(' ')}
+                draggable={slot.kind === 'sticker'}
+                onClick={() => (slot.kind === 'sticker' ? onSelect(slot.item.id) : onAppend())}
+                title={slot.kind === 'empty' ? 'Add a new sticker, or drop one from the library' : undefined}
+                onDragStart={(e) => {
+                  if (slot.kind !== 'sticker') return;
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', slot.item.id);
+                  setDragIndex(slot.index);
+                }}
+                onDragOver={(e) => {
+                  if (dragIndex !== null) {
                     e.preventDefault();
-                    setDropIndex(i + pageIndex * size);
-                  }}
-                  onDrop={(e) => {
+                    e.dataTransfer.dropEffect = 'move';
+                    setDrop({ slot: slotNumber, mode: 'move' });
+                  } else if (e.dataTransfer.types.includes(LIBRARY_DRAG_TYPE)) {
                     e.preventDefault();
-                    if (dragIndex !== null && target !== dragIndex) onMove(dragIndex, target);
-                    endDrag();
-                  }}
-                  onDragEnd={endDrag}
-                >
-                  {slot.kind === 'sticker' && <StickerFace sticker={slot.sticker} placeholder />}
-                </div>
-              );
+                    e.dataTransfer.dropEffect = 'copy';
+                    setDrop({ slot: slotNumber, mode: 'insert' });
+                  }
+                }}
+                onDragLeave={() => setDrop((d) => (d?.slot === slotNumber ? null : d))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const stickerId = e.dataTransfer.getData(LIBRARY_DRAG_TYPE);
+                  if (dragIndex !== null) {
+                    if (moveTarget !== dragIndex) onMove(dragIndex, moveTarget);
+                  } else if (stickerId) {
+                    onInsert(stickerId, insertTarget);
+                  }
+                  endDrag();
+                }}
+                onDragEnd={endDrag}
+              >
+                {slot.kind === 'sticker' && <StickerFace sticker={slot.sticker} placeholder />}
+              </div>
+            );
           })}
         </Paper>
       ))}
@@ -193,9 +234,9 @@ export function StickerSheetEditor({ sheet, selectedId, onSelect, onAppend, onMo
 }
 
 /** Print-only rendering, portalled to <body> and shown exclusively by the print stylesheet. */
-export function StickerSheetPrint({ sheet }: { sheet: Sheet }) {
+export function StickerSheetPrint({ sheet, stickers }: { sheet: Sheet; stickers: Record<string, Sticker> }) {
   const paper = paperSize(sheet.settings);
-  const pages = paginate(sheet);
+  const pages = paginate(sheet, stickers);
   return createPortal(
     <div className="ks-print-root">
       {/* Margins are drawn by the paper element itself so print matches the preview exactly */}

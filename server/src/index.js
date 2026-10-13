@@ -31,6 +31,10 @@ api.delete('/sheets/:id', async (req, res) => {
   res.status(204).end();
 });
 
+api.get('/stickers', async (req, res) => res.json(await storage.listStickers()));
+api.put('/stickers/:id', async (req, res) => res.json(await storage.saveSticker(req.params.id, req.body)));
+api.delete('/stickers/:id', async (req, res) => res.json(await storage.deleteSticker(req.params.id)));
+
 api.get('/icons', async (req, res) => res.json(await storage.listIcons()));
 api.put(
   '/icons/:folder/:name',

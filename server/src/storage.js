@@ -12,7 +12,8 @@ export class ValidationError extends Error {}
 
 /**
  * File based storage rooted at a data directory (typically a docker volume):
- *   <dataDir>/sheets/<id>.json
+ *   <dataDir>/stickers.json         the global sticker library
+ *   <dataDir>/sheets/<id>.json      sheets, referring to library stickers by id
  *   <dataDir>/icons/<folder>/<file>
  */
 export class Storage {
@@ -21,6 +22,15 @@ export class Storage {
     this.seedDir = seedDir ? path.resolve(seedDir) : null;
     this.sheetsDir = path.join(this.dataDir, 'sheets');
     this.iconsDir = path.join(this.dataDir, 'icons');
+    this.libraryFile = path.join(this.dataDir, 'stickers.json');
+    this.queue = Promise.resolve();
+  }
+
+  /** Runs read-modify-write operations one at a time so concurrent requests can't lose updates. */
+  exclusive(fn) {
+    const result = this.queue.then(fn);
+    this.queue = result.catch(() => {});
+    return result;
   }
 
   /** Creates the directory layout and copies seed data on first start. */
@@ -34,6 +44,103 @@ export class Storage {
         console.log(`Seeded ${dir} from ${seed}`);
       }
     }
+    await this.migrateEmbeddedStickers();
+  }
+
+  /**
+   * Sheets used to embed their stickers. Moves them into the library (merging identical
+   * stickers into one entry) and replaces them with references.
+   */
+  async migrateEmbeddedStickers() {
+    const library = await this.readLibrary();
+    const byContent = new Map(library.map((s) => [contentKey(s), s]));
+    const migrated = [];
+    for (const file of await this.sheetFiles()) {
+      const raw = JSON.parse(await fs.readFile(file, 'utf8'));
+      if (Array.isArray(raw.items) || !Array.isArray(raw.stickers)) continue;
+      raw.items = raw.stickers.map((embedded) => {
+        const sticker = normalizeSticker(embedded);
+        const existing = byContent.get(contentKey(sticker));
+        if (existing) return { id: crypto.randomUUID(), stickerId: existing.id };
+        if (library.some((s) => s.id === sticker.id)) sticker.id = crypto.randomUUID();
+        library.push(sticker);
+        byContent.set(contentKey(sticker), sticker);
+        return { id: crypto.randomUUID(), stickerId: sticker.id };
+      });
+      delete raw.stickers;
+      migrated.push([file, raw]);
+    }
+    if (migrated.length === 0) return;
+    // Library first, so sheets never refer to stickers that don't exist yet
+    await writeJsonAtomic(this.libraryFile, library);
+    for (const [file, sheet] of migrated) await writeJsonAtomic(file, sheet);
+    console.log(`Migrated ${migrated.length} sheet(s) to the sticker library (${library.length} stickers)`);
+  }
+
+  // ---------- Sticker library ----------
+
+  async readLibrary() {
+    try {
+      const data = JSON.parse(await fs.readFile(this.libraryFile, 'utf8'));
+      return Array.isArray(data) ? data.map(normalizeSticker) : [];
+    } catch (e) {
+      if (e.code === 'ENOENT') return [];
+      throw e;
+    }
+  }
+
+  /** All library stickers, each with the ids of the sheets that use it. */
+  async listStickers() {
+    const [library, sheets] = await Promise.all([this.readLibrary(), this.readAllSheets()]);
+    const usage = new Map();
+    for (const sheet of sheets) {
+      for (const item of sheet.items) {
+        const ids = usage.get(item.stickerId) ?? new Set();
+        ids.add(sheet.id);
+        usage.set(item.stickerId, ids);
+      }
+    }
+    return library.map((s) => ({ ...s, sheets: [...(usage.get(s.id) ?? [])] }));
+  }
+
+  /** Creates or replaces a library sticker. */
+  saveSticker(id, input) {
+    if (!ID_PATTERN.test(id)) throw new ValidationError(`Invalid sticker id: ${id}`);
+    return this.exclusive(async () => {
+      const library = await this.readLibrary();
+      const now = new Date().toISOString();
+      const index = library.findIndex((s) => s.id === id);
+      const sticker = normalizeSticker({
+        ...input,
+        id,
+        createdAt: index >= 0 ? library[index].createdAt : now,
+        updatedAt: now,
+      });
+      if (index >= 0) library[index] = sticker;
+      else library.push(sticker);
+      await writeJsonAtomic(this.libraryFile, library);
+      return sticker;
+    });
+  }
+
+  /** Deletes a library sticker and removes it from every sheet. Returns the ids of the affected sheets. */
+  deleteSticker(id) {
+    return this.exclusive(async () => {
+      const library = await this.readLibrary();
+      if (!library.some((s) => s.id === id)) throw new NotFoundError(`Sticker ${id} not found`);
+      const affected = [];
+      for (const sheet of await this.readAllSheets()) {
+        const items = sheet.items.filter((i) => i.stickerId !== id);
+        if (items.length === sheet.items.length) continue;
+        await writeJsonAtomic(this.sheetFile(sheet.id), { ...sheet, items, updatedAt: new Date().toISOString() });
+        affected.push(sheet.id);
+      }
+      await writeJsonAtomic(
+        this.libraryFile,
+        library.filter((s) => s.id !== id),
+      );
+      return { affectedSheets: affected };
+    });
   }
 
   // ---------- Sheets ----------
@@ -43,25 +150,30 @@ export class Storage {
     return path.join(this.sheetsDir, `${id}.json`);
   }
 
-  async listSheets() {
-    const files = (await fs.readdir(this.sheetsDir)).filter((f) => f.endsWith('.json'));
+  async sheetFiles() {
+    const files = await fs.readdir(this.sheetsDir);
+    return files.filter((f) => f.endsWith('.json')).map((f) => path.join(this.sheetsDir, f));
+  }
+
+  async readAllSheets() {
     const sheets = await Promise.all(
-      files.map(async (f) => {
+      (await this.sheetFiles()).map(async (file) => {
         try {
-          const sheet = JSON.parse(await fs.readFile(path.join(this.sheetsDir, f), 'utf8'));
-          return {
-            id: sheet.id,
-            name: sheet.name,
-            stickerCount: sheet.stickers?.length ?? 0,
-            updatedAt: sheet.updatedAt,
-          };
+          return normalizeSheet(JSON.parse(await fs.readFile(file, 'utf8')));
         } catch (e) {
-          console.warn(`Skipping unreadable sheet ${f}: ${e.message}`);
+          console.warn(`Skipping unreadable sheet ${file}: ${e.message}`);
           return null;
         }
       }),
     );
-    return sheets.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+    return sheets.filter(Boolean);
+  }
+
+  async listSheets() {
+    const sheets = await this.readAllSheets();
+    return sheets
+      .map((s) => ({ id: s.id, name: s.name, stickerCount: s.items.length, updatedAt: s.updatedAt }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async getSheet(id) {
@@ -74,32 +186,38 @@ export class Storage {
     }
   }
 
-  async createSheet(input) {
-    const now = new Date().toISOString();
-    const sheet = normalizeSheet({ ...input, id: crypto.randomUUID(), createdAt: now, updatedAt: now });
-    await writeJsonAtomic(this.sheetFile(sheet.id), sheet);
-    return sheet;
-  }
-
-  async updateSheet(id, input) {
-    const existing = await this.getSheet(id);
-    const sheet = normalizeSheet({
-      ...input,
-      id,
-      createdAt: existing.createdAt,
-      updatedAt: new Date().toISOString(),
+  createSheet(input) {
+    return this.exclusive(async () => {
+      const now = new Date().toISOString();
+      const sheet = normalizeSheet({ ...input, id: crypto.randomUUID(), createdAt: now, updatedAt: now });
+      await writeJsonAtomic(this.sheetFile(sheet.id), sheet);
+      return sheet;
     });
-    await writeJsonAtomic(this.sheetFile(id), sheet);
-    return sheet;
   }
 
-  async deleteSheet(id) {
-    try {
-      await fs.unlink(this.sheetFile(id));
-    } catch (e) {
-      if (e.code === 'ENOENT') throw new NotFoundError(`Sheet ${id} not found`);
-      throw e;
-    }
+  updateSheet(id, input) {
+    return this.exclusive(async () => {
+      const existing = await this.getSheet(id);
+      const sheet = normalizeSheet({
+        ...input,
+        id,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString(),
+      });
+      await writeJsonAtomic(this.sheetFile(id), sheet);
+      return sheet;
+    });
+  }
+
+  deleteSheet(id) {
+    return this.exclusive(async () => {
+      try {
+        await fs.unlink(this.sheetFile(id));
+      } catch (e) {
+        if (e.code === 'ENOENT') throw new NotFoundError(`Sheet ${id} not found`);
+        throw e;
+      }
+    });
   }
 
   // ---------- Icons ----------
@@ -154,23 +272,35 @@ function str(value, max = 200) {
   return typeof value === 'string' ? value.slice(0, max) : '';
 }
 
+const validId = (id) => (typeof id === 'string' && ID_PATTERN.test(id) ? id : null);
+
+function normalizeSticker(input) {
+  return {
+    id: validId(input?.id) ?? crypto.randomUUID(),
+    line1: str(input?.line1),
+    line2: str(input?.line2),
+    shortcut: str(input?.shortcut),
+    icon: str(input?.icon, 300),
+    createdAt: str(input?.createdAt, 40) || undefined,
+    updatedAt: str(input?.updatedAt, 40) || undefined,
+  };
+}
+
+const contentKey = (s) => JSON.stringify([s.line1, s.line2, s.shortcut, s.icon]);
+
 function normalizeSheet(input) {
   if (!input || typeof input !== 'object') throw new ValidationError('Sheet must be an object');
-  const stickers = Array.isArray(input.stickers) ? input.stickers : [];
-  const settings = input.settings ?? {};
+  const items = Array.isArray(input.items) ? input.items : [];
   return {
     id: input.id,
     name: str(input.name, 100).trim() || 'Untitled sheet',
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
-    settings: normalizeSettings(settings),
-    stickers: stickers.map((s) => ({
-      id: ID_PATTERN.test(s?.id ?? '') ? s.id : crypto.randomUUID(),
-      line1: str(s?.line1),
-      line2: str(s?.line2),
-      shortcut: str(s?.shortcut),
-      icon: str(s?.icon, 300),
-    })),
+    settings: normalizeSettings(input.settings ?? {}),
+    // Each item places a library sticker on the sheet; a sticker may be placed several times
+    items: items
+      .filter((i) => validId(i?.stickerId))
+      .map((i) => ({ id: validId(i.id) ?? crypto.randomUUID(), stickerId: i.stickerId })),
   };
 }
 

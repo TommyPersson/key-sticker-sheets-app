@@ -1,4 +1,4 @@
-import type { IconInfo, Sheet, SheetSummary } from './types';
+import type { IconInfo, LibrarySticker, Sheet, SheetSummary, Sticker } from './types';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -27,6 +27,12 @@ export const api = {
   createSheet: (sheet: Partial<Sheet>) => request<Sheet>('/api/sheets', json('POST', sheet)),
   updateSheet: (sheet: Sheet) => request<Sheet>(`/api/sheets/${encodeURIComponent(sheet.id)}`, json('PUT', sheet)),
   deleteSheet: (id: string) => request<void>(`/api/sheets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  listStickers: () => request<LibrarySticker[]>('/api/stickers'),
+  saveSticker: (sticker: Sticker) =>
+    request<Sticker>(`/api/stickers/${encodeURIComponent(sticker.id)}`, json('PUT', sticker)),
+  deleteSticker: (id: string) =>
+    request<{ affectedSheets: string[] }>(`/api/stickers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   listIcons: () => request<IconInfo[]>('/api/icons'),
   uploadIcon: (folder: string, file: File) =>

@@ -172,6 +172,21 @@
   outline-offset: 0.3mm;
 }
 
+.ks-interactive .ks-item.insert-before::before {
+  content: '';
+  position: absolute;
+  left: -1.4mm;
+  top: -0.5mm;
+  bottom: -0.5mm;
+  width: 0.8mm;
+  border-radius: 0.4mm;
+  background: #ff9800;
+}
+
+.ks-interactive .ks-item.insert-before {
+  overflow: visible;
+}
+
 .ks-interactive .ks-item.dragging {
   opacity: 0.4;
 }
@@ -210,4 +225,9 @@
   body {
     background: #fff !important;
   }
+}
+
+/* Sticker contents must not interfere with drag & drop on the slot */
+.ks-interactive .ks-item > * {
+  pointer-events: none;
 }

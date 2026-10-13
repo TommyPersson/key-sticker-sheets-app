@@ -1,3 +1,4 @@
+/** A sticker in the global library */
 export interface Sticker {
   id: string;
   line1: string;
@@ -5,6 +6,19 @@ export interface Sticker {
   shortcut: string;
   /** Icon path relative to the icon store, e.g. "intellij/debug.svg". Empty for no icon. */
   icon: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Library sticker as listed by the server, with the ids of the sheets using it */
+export interface LibrarySticker extends Sticker {
+  sheets: string[];
+}
+
+/** A placement of a library sticker on a sheet */
+export interface SheetItem {
+  id: string;
+  stickerId: string;
 }
 
 export interface SheetSettings {
@@ -42,7 +56,7 @@ export interface Sheet {
   createdAt?: string;
   updatedAt?: string;
   settings: SheetSettings;
-  stickers: Sticker[];
+  items: SheetItem[];
 }
 
 export interface SheetSummary {

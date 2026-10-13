@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   AppBar,
@@ -11,6 +11,8 @@ import {
   Paper,
   Snackbar,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Toolbar,
   Tooltip,
@@ -27,50 +29,78 @@ import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import { api } from './api';
 import { SheetList } from './components/SheetList';
-import { StickerEditor } from './components/StickerEditor';
+import { Library } from './components/Library';
+import { StickerEditor, type PlacementActions } from './components/StickerEditor';
 import { IconPicker } from './components/IconPicker';
 import { StickerSheetEditor, StickerSheetPrint, perPage } from './components/StickerSheet';
 import { PageSetup } from './components/PageSetup';
-import { dimensionsOf, gridFor } from './paper';
-import { parseImport } from './importExport';
-import { useSheetEditor, type SaveStatus } from './useSheetEditor';
-import type { IconInfo, Sheet, SheetSummary, Sticker } from './types';
+import { DEFAULT_DIMENSIONS, dimensionsOf, gridFor } from './paper';
+import { contentKey, parseImport, toSheetFile } from './importExport';
+import { useWorkspace, type SaveStatus } from './useWorkspace';
+import type { IconInfo, LibrarySticker, Sheet, SheetItem, SheetSummary, Sticker } from './types';
 
-const SIDEBAR_WIDTH = 260;
+const SIDEBAR_WIDTH = 280;
 const EDITOR_WIDTH = 340;
 
-const newSticker = (): Sticker => ({ id: crypto.randomUUID(), line1: '', line2: '', shortcut: '', icon: '' });
+type SidebarTab = 'sheets' | 'library';
+/** A sticker placed on the open sheet, or a sticker picked in the library */
+type Selection = { kind: 'item'; id: string } | { kind: 'sticker'; id: string } | null;
+
+const blankSticker = (): Sticker => ({ id: crypto.randomUUID(), line1: '', line2: '', shortcut: '', icon: '' });
+const newItem = (stickerId: string): SheetItem => ({ id: crypto.randomUUID(), stickerId });
+
+/** Library list from the server as an id → sticker map (dropping the usage info) */
+const toMap = (list: LibrarySticker[]): Record<string, Sticker> =>
+  Object.fromEntries(list.map(({ sheets: _sheets, ...sticker }) => [sticker.id, sticker]));
+const toRefs = (list: LibrarySticker[]) => Object.fromEntries(list.map((s) => [s.id, s.sheets]));
 
 const hashSheetId = () => decodeURIComponent(window.location.hash.replace(/^#\/?sheet\//, '')) || null;
 
-function loadZoom() {
+function stored<T extends string>(key: string, fallback: T): T {
   try {
-    return Number(localStorage.getItem('ks-zoom')) || 1.25;
+    return (localStorage.getItem(key) as T) || fallback;
   } catch {
-    return 1.25;
+    return fallback;
+  }
+}
+
+function store(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // storage unavailable
   }
 }
 
 export default function App() {
   const [sheets, setSheets] = useState<SheetSummary[] | null>(null);
+  /** Sheet ids using each sticker, as last reported by the server */
+  const [stickerRefs, setStickerRefs] = useState<Record<string, string[]>>({});
   const [icons, setIcons] = useState<IconInfo[]>([]);
-  const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(() => stored('ks-sidebar', 'sheets'));
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [zoom, setZoom] = useState(loadZoom);
+  const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', '1.25')) || 1.25);
   const [message, setMessage] = useState<{ text: string; severity: 'error' | 'success' } | null>(null);
 
   const showError = useCallback((text: string) => setMessage({ text, severity: 'error' }), []);
-  const onSaved = useCallback((saved: Sheet) => {
-    setSheets((list) =>
-      list?.map((s) =>
-        s.id === saved.id
-          ? { id: saved.id, name: saved.name, stickerCount: saved.stickers.length, updatedAt: saved.updatedAt }
-          : s,
-      ) ?? null,
+  const onSheetSaved = useCallback((saved: Sheet) => {
+    setSheets(
+      (list) =>
+        list?.map((s) =>
+          s.id === saved.id
+            ? { id: saved.id, name: saved.name, stickerCount: saved.items.length, updatedAt: saved.updatedAt }
+            : s,
+        ) ?? null,
     );
   }, []);
-  const editor = useSheetEditor(onSaved, showError);
-  const { sheet, edit } = editor;
+  const ws = useWorkspace(onSheetSaved, showError);
+  const { sheet, stickers, edit } = ws;
+
+  useEffect(() => store('ks-zoom', String(zoom)), [zoom]);
+  useEffect(() => store('ks-sidebar', sidebarTab), [sidebarTab]);
+
+  // ---------- Loading ----------
 
   const refreshSheets = useCallback(async () => {
     const list = await api.listSheets();
@@ -78,69 +108,123 @@ export default function App() {
     return list;
   }, []);
 
+  /** Reloads the library from the server. Pending edits are saved first. */
+  const refreshLibrary = useCallback(async () => {
+    await ws.flush();
+    const list = await api.listStickers();
+    setStickerRefs(toRefs(list));
+    return list;
+  }, [ws.flush]);
+
   const refreshIcons = useCallback(() => {
     api.listIcons().then(setIcons, (e) => showError(`Could not load icons: ${e.message}`));
   }, [showError]);
 
   const openSheet = useCallback(
     async (id: string | null) => {
-      await editor.flush();
-      setSelectedStickerId(null);
+      await ws.flush();
+      setSelection((s) => (s?.kind === 'item' ? null : s));
       if (!id) {
-        editor.load(null);
+        ws.load(null);
         history.replaceState(null, '', window.location.pathname);
         return;
       }
       try {
-        editor.load(await api.getSheet(id));
+        const [loaded] = await Promise.all([api.getSheet(id), refreshLibrary()]);
+        ws.load(loaded);
         if (hashSheetId() !== id) history.replaceState(null, '', `#/sheet/${encodeURIComponent(id)}`);
       } catch (e) {
         showError(`Could not open sheet: ${(e as Error).message}`);
       }
     },
-    [editor.flush, editor.load, showError],
+    [ws.flush, ws.load, refreshLibrary, showError],
   );
 
   // Initial load
   useEffect(() => {
     refreshIcons();
-    refreshSheets().then(
-      (list) => {
+    Promise.all([refreshSheets(), api.listStickers()]).then(
+      ([list, library]) => {
+        setStickerRefs(toRefs(library));
+        ws.load(null, toMap(library));
         const wanted = hashSheetId();
         openSheet(list.find((s) => s.id === wanted)?.id ?? list[0]?.id ?? null);
       },
-      (e) => showError(`Could not load sheets: ${e.message}`),
+      (e) => showError(`Could not load data: ${e.message}`),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Follow sheet links and back/forward navigation
   useEffect(() => {
-    try {
-      localStorage.setItem('ks-zoom', String(zoom));
-    } catch {
-      // storage unavailable
-    }
-  }, [zoom]);
+    const onHashChange = () => {
+      const id = hashSheetId();
+      if (id && id !== sheet?.id && sheets?.some((s) => s.id === id)) openSheet(id);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [sheet?.id, sheets, openSheet]);
 
-  // ---------- Sticker operations ----------
+  // ---------- Derived state ----------
 
-  const stickers = sheet?.stickers ?? [];
-  const selectedIndex = stickers.findIndex((s) => s.id === selectedStickerId);
-  const selected = selectedIndex >= 0 ? stickers[selectedIndex] : null;
+  const items = sheet?.items ?? [];
+  const dimensions = sheet ? dimensionsOf(sheet.settings) : DEFAULT_DIMENSIONS;
 
-  const setStickers = (fn: (list: Sticker[]) => Sticker[], key?: string) =>
-    edit((s) => ({ ...s, stickers: fn(s.stickers) }), key);
+  const onSheet = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) counts.set(item.stickerId, (counts.get(item.stickerId) ?? 0) + 1);
+    return counts;
+  }, [items]);
 
-  const insertSticker = (sticker: Sticker, at: number) => {
-    setStickers((list) => [...list.slice(0, at), sticker, ...list.slice(at)]);
-    setSelectedStickerId(sticker.id);
+  /** Sheets using a sticker: the server's view for other sheets, the live state for the open one */
+  const usedOnIds = useCallback(
+    (stickerId: string) => {
+      const ids = new Set((stickerRefs[stickerId] ?? []).filter((id) => id !== sheet?.id));
+      if (sheet && onSheet.has(stickerId)) ids.add(sheet.id);
+      return [...ids];
+    },
+    [stickerRefs, sheet, onSheet],
+  );
+  const sheetCount = useCallback((stickerId: string) => usedOnIds(stickerId).length, [usedOnIds]);
+  const sheetName = (id: string) => (id === sheet?.id ? sheet.name : (sheets?.find((s) => s.id === id)?.name ?? id));
+
+  const selectedIndex = selection?.kind === 'item' ? items.findIndex((i) => i.id === selection.id) : -1;
+  const selectedItem = selectedIndex >= 0 ? items[selectedIndex] : null;
+  const selectedSticker =
+    selection?.kind === 'sticker' ? stickers[selection.id] : selectedItem ? stickers[selectedItem.stickerId] : undefined;
+
+  // ---------- Editing ----------
+
+  const setItems = (fn: (list: SheetItem[]) => SheetItem[], key?: string) =>
+    edit((w) => (w.sheet ? { ...w, sheet: { ...w.sheet, items: fn(w.sheet.items) } } : w), key);
+
+  const updateSticker = (id: string, patch: Partial<Sticker>, key?: string) =>
+    edit((w) => ({ ...w, stickers: { ...w.stickers, [id]: { ...w.stickers[id], ...patch } } }), key);
+
+  /** Places a library sticker on the sheet and selects the placement */
+  const place = (stickerId: string, at: number) => {
+    const item = newItem(stickerId);
+    setItems((list) => [...list.slice(0, at), item, ...list.slice(at)]);
+    setSelection({ kind: 'item', id: item.id });
   };
 
-  const addSticker = () => insertSticker(newSticker(), selectedIndex >= 0 ? selectedIndex + 1 : stickers.length);
+  /** Creates a sticker in the library and, when a position is given, places it on the sheet (one undo step) */
+  const createSticker = (at?: number) => {
+    const sticker = blankSticker();
+    const item = newItem(sticker.id);
+    edit((w) => ({
+      stickers: { ...w.stickers, [sticker.id]: sticker },
+      sheet:
+        at !== undefined && w.sheet
+          ? { ...w.sheet, items: [...w.sheet.items.slice(0, at), item, ...w.sheet.items.slice(at)] }
+          : w.sheet,
+    }));
+    setSelection(at !== undefined && sheet ? { kind: 'item', id: item.id } : { kind: 'sticker', id: sticker.id });
+  };
 
-  const moveSticker = (from: number, to: number) => {
-    if (to < 0 || to >= stickers.length || from === to) return;
-    setStickers((list) => {
+  const moveItem = (from: number, to: number) => {
+    if (to < 0 || to >= items.length || from === to) return;
+    setItems((list) => {
       const copy = [...list];
       const [item] = copy.splice(from, 1);
       copy.splice(to, 0, item);
@@ -148,11 +232,40 @@ export default function App() {
     });
   };
 
-  const deleteSelected = () => {
-    if (selectedIndex < 0) return;
-    const next = stickers[selectedIndex + 1] ?? stickers[selectedIndex - 1] ?? null;
-    setStickers((list) => list.filter((s) => s.id !== selectedStickerId));
-    setSelectedStickerId(next?.id ?? null);
+  const removeSelectedItem = () => {
+    if (!selectedItem) return;
+    const next = items[selectedIndex + 1] ?? items[selectedIndex - 1] ?? null;
+    setItems((list) => list.filter((i) => i.id !== selectedItem.id));
+    setSelection(next ? { kind: 'item', id: next.id } : null);
+  };
+
+  /** Points the selected placement at a new copy of its sticker, so it can be edited separately */
+  const makeCopy = () => {
+    if (!selectedItem || !selectedSticker) return;
+    const copy = { ...selectedSticker, id: crypto.randomUUID(), createdAt: undefined, updatedAt: undefined };
+    edit((w) => ({
+      stickers: { ...w.stickers, [copy.id]: copy },
+      sheet: w.sheet && {
+        ...w.sheet,
+        items: w.sheet.items.map((i) => (i.id === selectedItem.id ? { ...i, stickerId: copy.id } : i)),
+      },
+    }));
+    setMessage({ text: 'This spot now uses its own copy of the sticker', severity: 'success' });
+  };
+
+  const deleteFromLibrary = async (stickerId: string) => {
+    const usedOn = usedOnIds(stickerId).map(sheetName);
+    const where = usedOn.length ? `\n\nIt will also be removed from: ${usedOn.join(', ')}.` : '';
+    if (!confirm(`Delete this sticker from the library?${where}\n\nThis cannot be undone.`)) return;
+    try {
+      await ws.flush();
+      await api.deleteSticker(stickerId);
+      ws.forgetSticker(stickerId);
+      setSelection(null);
+      await Promise.all([refreshLibrary(), refreshSheets()]);
+    } catch (e) {
+      showError(`Could not delete sticker: ${(e as Error).message}`);
+    }
   };
 
   // ---------- Keyboard shortcuts ----------
@@ -164,25 +277,25 @@ export default function App() {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'z' && !typing) {
         e.preventDefault();
-        if (e.shiftKey) editor.redo();
-        else editor.undo();
+        if (e.shiftKey) ws.redo();
+        else ws.undo();
       } else if (mod && e.key.toLowerCase() === 'y' && !typing) {
         e.preventDefault();
-        editor.redo();
+        ws.redo();
       } else if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        editor.flush();
-      } else if (!typing && !pickerOpen && selected) {
-        const cols = sheet ? gridFor(sheet.settings).columns : 5;
+        ws.flush();
+      } else if (!typing && !pickerOpen && e.key === 'Escape') {
+        setSelection(null);
+      } else if (!typing && !pickerOpen && selectedItem && sheet) {
+        const cols = gridFor(sheet.settings).columns;
         const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols };
         if (e.key in moves) {
           e.preventDefault();
-          const target = stickers[selectedIndex + moves[e.key]];
-          if (target) setSelectedStickerId(target.id);
+          const next = items[selectedIndex + moves[e.key]];
+          if (next) setSelection({ kind: 'item', id: next.id });
         } else if (e.key === 'Delete') {
-          deleteSelected();
-        } else if (e.key === 'Escape') {
-          setSelectedStickerId(null);
+          removeSelectedItem();
         }
       }
     };
@@ -192,7 +305,7 @@ export default function App() {
 
   // ---------- Sheet operations ----------
 
-  const createSheet = async (input: Partial<Sheet> = { name: 'New sheet', stickers: [] }) => {
+  const createSheet = async (input: Partial<Sheet> = { name: 'New sheet', items: [] }) => {
     try {
       const created = await api.createSheet(input);
       await refreshSheets();
@@ -204,22 +317,21 @@ export default function App() {
   };
 
   const duplicateSheet = async (id: string) => {
-    await editor.flush();
+    await ws.flush();
     const source = await api.getSheet(id);
-    await createSheet({
-      ...source,
-      name: `${source.name} (copy)`,
-      stickers: source.stickers.map((s) => ({ ...s, id: crypto.randomUUID() })),
-    });
+    // The copy places the same library stickers
+    await createSheet({ ...source, name: `${source.name} (copy)`, items: source.items.map((i) => newItem(i.stickerId)) });
   };
 
   const deleteSheet = async (id: string) => {
     const summary = sheets?.find((s) => s.id === id);
-    if (!confirm(`Delete sheet "${summary?.name}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete sheet "${summary?.name}"? Its stickers stay in the library. This cannot be undone.`)) return;
     try {
-      if (sheet?.id === id) editor.load(null);
+      await ws.flush();
+      if (sheet?.id === id) ws.load(null);
       await api.deleteSheet(id);
       const list = await refreshSheets();
+      await refreshLibrary();
       if (sheet?.id === id) openSheet(list[0]?.id ?? null);
     } catch (e) {
       showError(`Could not delete sheet: ${(e as Error).message}`);
@@ -227,8 +339,8 @@ export default function App() {
   };
 
   const exportSheet = async (id: string) => {
-    await editor.flush();
-    const data = await api.getSheet(id);
+    await ws.flush();
+    const data = toSheetFile(await api.getSheet(id), stickers);
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -237,11 +349,36 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   };
 
+  /** Imports a sheet file, reusing identical library stickers and adding the rest */
   const importSheet = async (file: File) => {
     try {
       const imported = parseImport(await file.text(), file.name.replace(/\.json$/i, ''));
-      const created = await createSheet(imported);
-      if (created) setMessage({ text: `Imported ${created.stickers.length} stickers`, severity: 'success' });
+      await ws.flush();
+      const library = new Map(Object.values(stickers).map((s) => [contentKey(s), s.id]));
+      let added = 0;
+      const stickerIds: string[] = [];
+      for (const content of imported.stickers) {
+        let id = library.get(contentKey(content));
+        if (!id) {
+          id = (await api.saveSticker({ ...content, id: crypto.randomUUID() })).id;
+          library.set(contentKey(content), id);
+          added++;
+        }
+        stickerIds.push(id);
+      }
+      ws.replaceLibrary(toMap(await refreshLibrary()));
+      const created = await createSheet({
+        name: imported.name,
+        settings: imported.settings,
+        items: stickerIds.map(newItem),
+      });
+      if (created) {
+        const reused = stickerIds.length - added;
+        setMessage({
+          text: `Imported ${stickerIds.length} stickers (${added} new, ${reused} already in the library)`,
+          severity: 'success',
+        });
+      }
     } catch (e) {
       showError(`Import failed: ${(e as Error).message}`);
     }
@@ -249,7 +386,18 @@ export default function App() {
 
   // ---------- Render ----------
 
-  const pageCount = sheet ? Math.max(1, Math.ceil((sheet.settings.skip + stickers.length) / perPage(sheet.settings))) : 0;
+  const pageCount = sheet ? Math.max(1, Math.ceil((sheet.settings.skip + items.length) / perPage(sheet.settings))) : 0;
+
+  const placement: PlacementActions | undefined =
+    selectedItem && sheet
+      ? {
+          index: selectedIndex,
+          count: items.length,
+          onMove: (delta) => moveItem(selectedIndex, selectedIndex + delta),
+          onRemove: removeSelectedItem,
+          onMakeCopy: makeCopy,
+        }
+      : undefined;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -263,137 +411,149 @@ export default function App() {
       </AppBar>
 
       <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Sheets */}
-        <Paper square elevation={0} sx={{ width: SIDEBAR_WIDTH, borderRight: 1, borderColor: 'divider', flexShrink: 0 }}>
-          {sheets === null ? (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : (
-            <SheetList
-              sheets={sheets}
-              selectedId={sheet?.id ?? null}
-              onSelect={openSheet}
-              onCreate={() => createSheet()}
-              onImport={importSheet}
-              onDuplicate={duplicateSheet}
-              onExport={exportSheet}
-              onDelete={deleteSheet}
-            />
-          )}
+        {/* Sheets and library */}
+        <Paper
+          square
+          elevation={0}
+          sx={{
+            width: SIDEBAR_WIDTH,
+            borderRight: 1,
+            borderColor: 'divider',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <Tabs value={sidebarTab} onChange={(_, v) => setSidebarTab(v)} variant="fullWidth" sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tab value="sheets" label={`Sheets${sheets ? ` (${sheets.length})` : ''}`} />
+            <Tab value="library" label={`Library (${Object.keys(stickers).length})`} />
+          </Tabs>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            {sheets === null ? (
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : sidebarTab === 'sheets' ? (
+              <SheetList
+                sheets={sheets}
+                selectedId={sheet?.id ?? null}
+                onSelect={openSheet}
+                onCreate={() => createSheet()}
+                onImport={importSheet}
+                onDuplicate={duplicateSheet}
+                onExport={exportSheet}
+                onDelete={deleteSheet}
+              />
+            ) : (
+              <Library
+                stickers={stickers}
+                dimensions={dimensions}
+                onSheet={onSheet}
+                sheetCount={sheetCount}
+                hasSheet={!!sheet}
+                selectedId={selectedSticker?.id ?? null}
+                onSelect={(id) => setSelection({ kind: 'sticker', id })}
+                onCreate={() => createSticker()}
+                onAddToSheet={(id) => place(id, items.length)}
+              />
+            )}
+          </Box>
         </Paper>
 
+        {/* Sheet canvas */}
         {sheet ? (
-          <>
-            {/* Sheet canvas */}
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <Paper
-                square
-                elevation={0}
-                sx={{ px: 2, py: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}
-              >
-                <TextField
-                  variant="standard"
-                  value={sheet.name}
-                  onChange={(e) => edit((s) => ({ ...s, name: e.target.value }), 'name')}
-                  slotProps={{ htmlInput: { 'aria-label': 'Sheet name', style: { fontSize: 18, fontWeight: 500 } } }}
-                  sx={{ minWidth: 200, flex: '0 1 320px' }}
-                />
-                <SaveIndicator status={editor.status} />
-                <Box sx={{ flex: 1 }} />
-                <Tooltip title="Undo (Ctrl+Z)">
-                  <span>
-                    <IconButton onClick={editor.undo} disabled={!editor.canUndo}>
-                      <UndoIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Redo (Ctrl+Y)">
-                  <span>
-                    <IconButton onClick={editor.redo} disabled={!editor.canRedo}>
-                      <RedoIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Divider orientation="vertical" flexItem />
-                <PageSetup
-                  settings={sheet.settings}
-                  onChange={(patch, key) => edit((s) => ({ ...s, settings: { ...s.settings, ...patch } }), key)}
-                />
-                <Divider orientation="vertical" flexItem />
-                <Stack direction="row" sx={{ alignItems: 'center' }}>
-                  <IconButton onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))} aria-label="Zoom out">
-                    <ZoomOutIcon />
-                  </IconButton>
-                  <Typography variant="body2" sx={{ width: 44, textAlign: 'center' }}>
-                    {Math.round(zoom * 100)}%
-                  </Typography>
-                  <IconButton onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))} aria-label="Zoom in">
-                    <ZoomInIcon />
-                  </IconButton>
-                </Stack>
-                <Button startIcon={<AddIcon />} onClick={addSticker}>
-                  Add sticker
-                </Button>
-                <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()} disabled={!stickers.length}>
-                  Print
-                </Button>
-              </Paper>
-
-              <Box
-                sx={{ flex: 1, overflow: 'auto', bgcolor: 'grey.200', p: 3 }}
-                onClick={(e) => e.target === e.currentTarget && setSelectedStickerId(null)}
-              >
-                <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
-                  {stickers.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit,
-                  drag to reorder
-                </Typography>
-                <Stack spacing={3} sx={{ zoom, width: 'fit-content', mx: 'auto' }}>
-                  <StickerSheetEditor
-                    sheet={sheet}
-                    selectedId={selectedStickerId}
-                    onSelect={setSelectedStickerId}
-                    onAppend={() => insertSticker(newSticker(), stickers.length)}
-                    onMove={moveSticker}
-                  />
-                </Stack>
-              </Box>
-            </Box>
-
-            {/* Sticker editor */}
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <Paper
               square
               elevation={0}
-              sx={{ width: EDITOR_WIDTH, borderLeft: 1, borderColor: 'divider', p: 2, overflowY: 'auto', flexShrink: 0 }}
+              sx={{
+                px: 2,
+                py: 1,
+                borderBottom: 1,
+                borderColor: 'divider',
+                display: 'flex',
+                gap: 2,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+              }}
             >
-              {selected ? (
-                <StickerEditor
-                  key={selected.id}
-                  sticker={selected}
-                  dimensions={dimensionsOf(sheet.settings)}
-                  index={selectedIndex}
-                  count={stickers.length}
-                  onChange={(patch) =>
-                    setStickers(
-                      (list) => list.map((s) => (s.id === selected.id ? { ...s, ...patch } : s)),
-                      `${selected.id}:${Object.keys(patch).join()}`,
-                    )
-                  }
-                  onChooseIcon={() => setPickerOpen(true)}
-                  onDuplicate={() => insertSticker({ ...selected, id: crypto.randomUUID() }, selectedIndex + 1)}
-                  onDelete={deleteSelected}
-                  onMove={(delta) => moveSticker(selectedIndex, selectedIndex + delta)}
-                />
-              ) : (
-                <Box sx={{ color: 'text.secondary', textAlign: 'center', mt: 6 }}>
-                  <Typography variant="body2">Select a sticker to edit it,</Typography>
-                  <Typography variant="body2">or click an empty slot to add one.</Typography>
-                </Box>
-              )}
+              <TextField
+                variant="standard"
+                value={sheet.name}
+                onChange={(e) => edit((w) => w.sheet ? { ...w, sheet: { ...w.sheet, name: e.target.value } } : w, 'name')}
+                slotProps={{ htmlInput: { 'aria-label': 'Sheet name', style: { fontSize: 18, fontWeight: 500 } } }}
+                sx={{ minWidth: 200, flex: '0 1 320px' }}
+              />
+              <SaveIndicator status={ws.status} />
+              <Box sx={{ flex: 1 }} />
+              <Tooltip title="Undo (Ctrl+Z)">
+                <span>
+                  <IconButton onClick={ws.undo} disabled={!ws.canUndo}>
+                    <UndoIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Redo (Ctrl+Y)">
+                <span>
+                  <IconButton onClick={ws.redo} disabled={!ws.canRedo}>
+                    <RedoIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Divider orientation="vertical" flexItem />
+              <PageSetup
+                settings={sheet.settings}
+                onChange={(patch, key) =>
+                  edit((w) => (w.sheet ? { ...w, sheet: { ...w.sheet, settings: { ...w.sheet.settings, ...patch } } } : w), key)
+                }
+              />
+              <Divider orientation="vertical" flexItem />
+              <Stack direction="row" sx={{ alignItems: 'center' }}>
+                <IconButton onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))} aria-label="Zoom out">
+                  <ZoomOutIcon />
+                </IconButton>
+                <Typography variant="body2" sx={{ width: 44, textAlign: 'center' }}>
+                  {Math.round(zoom * 100)}%
+                </Typography>
+                <IconButton onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))} aria-label="Zoom in">
+                  <ZoomInIcon />
+                </IconButton>
+              </Stack>
+              <Tooltip title="Create a new sticker in the library and place it on this sheet">
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => createSticker(selectedIndex >= 0 ? selectedIndex + 1 : items.length)}
+                >
+                  New sticker
+                </Button>
+              </Tooltip>
+              <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()} disabled={!items.length}>
+                Print
+              </Button>
             </Paper>
 
-            <StickerSheetPrint sheet={sheet} />
-          </>
+            <Box
+              sx={{ flex: 1, overflow: 'auto', bgcolor: 'grey.200', p: 3 }}
+              onClick={(e) => e.target === e.currentTarget && setSelection(null)}
+            >
+              <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
+                {items.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit, drag to
+                reorder, drag from the library to add
+              </Typography>
+              <Stack spacing={3} sx={{ zoom, width: 'fit-content', mx: 'auto' }}>
+                <StickerSheetEditor
+                  sheet={sheet}
+                  stickers={stickers}
+                  selectedId={selectedItem?.id ?? null}
+                  onSelect={(id) => setSelection({ kind: 'item', id })}
+                  onAppend={() => createSticker(items.length)}
+                  onMove={moveItem}
+                  onInsert={place}
+                />
+              </Stack>
+            </Box>
+            <StickerSheetPrint sheet={sheet} stickers={stickers} />
+          </Box>
         ) : (
           <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', color: 'text.secondary' }}>
             {sheets?.length === 0 ? (
@@ -408,16 +568,49 @@ export default function App() {
             )}
           </Box>
         )}
+
+        {/* Sticker editor */}
+        {(sheet || selectedSticker) && (
+          <Paper
+            square
+            elevation={0}
+            sx={{ width: EDITOR_WIDTH, borderLeft: 1, borderColor: 'divider', p: 2, overflowY: 'auto', flexShrink: 0 }}
+          >
+            {selectedSticker ? (
+              <StickerEditor
+                key={selection?.id}
+                sticker={selectedSticker}
+                dimensions={dimensions}
+                usedOn={usedOnIds(selectedSticker.id).map(sheetName)}
+                placement={placement}
+                onAddToSheet={
+                  selection?.kind === 'sticker' && sheet ? () => place(selectedSticker.id, items.length) : undefined
+                }
+                onChange={(patch) =>
+                  updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)
+                }
+                onChooseIcon={() => setPickerOpen(true)}
+                onDeleteFromLibrary={() => deleteFromLibrary(selectedSticker.id)}
+              />
+            ) : (
+              <Box sx={{ color: 'text.secondary', textAlign: 'center', mt: 6 }}>
+                <Typography variant="body2">Select a sticker to edit it,</Typography>
+                <Typography variant="body2">click an empty slot to create one,</Typography>
+                <Typography variant="body2">or drag one in from the library.</Typography>
+              </Box>
+            )}
+          </Paper>
+        )}
       </Box>
 
-      {selected && (
+      {selectedSticker && (
         <IconPicker
           open={pickerOpen}
           icons={icons}
-          value={selected.icon}
+          value={selectedSticker.icon}
           onClose={() => setPickerOpen(false)}
           onSelect={(icon) => {
-            setStickers((list) => list.map((s) => (s.id === selected.id ? { ...s, icon } : s)));
+            updateSticker(selectedSticker.id, { icon });
             setPickerOpen(false);
           }}
           onIconsChanged={refreshIcons}
