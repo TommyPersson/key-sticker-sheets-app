@@ -222,6 +222,45 @@ export class Storage {
 
   // ---------- Icons ----------
 
+  /** Icon folders, including empty ones */
+  async listIconFolders() {
+    const entries = await fs.readdir(this.iconsDir, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  iconFolder(folder) {
+    if (!SEGMENT_PATTERN.test(folder ?? '')) throw new ValidationError('Invalid folder name');
+    return path.join(this.iconsDir, folder);
+  }
+
+  async createIconFolder(folder) {
+    const dir = this.iconFolder(folder);
+    try {
+      await fs.mkdir(dir);
+    } catch (e) {
+      if (e.code === 'EEXIST') throw new ValidationError(`Folder "${folder}" already exists`);
+      throw e;
+    }
+    return folder;
+  }
+
+  /** Deletes an empty folder. Folders with icons must be emptied first. */
+  async deleteIconFolder(folder) {
+    const dir = this.iconFolder(folder);
+    let entries;
+    try {
+      entries = await fs.readdir(dir);
+    } catch (e) {
+      if (e.code === 'ENOENT') throw new NotFoundError('Folder not found');
+      throw e;
+    }
+    if (entries.length > 0) throw new ValidationError(`Folder "${folder}" is not empty`);
+    await fs.rmdir(dir);
+  }
+
   async listIcons() {
     const icons = [];
     const entries = await fs.readdir(this.iconsDir, { withFileTypes: true });
@@ -262,9 +301,6 @@ export class Storage {
       if (e.code === 'ENOENT') throw new NotFoundError('Icon not found');
       throw e;
     }
-    // Remove the folder when it becomes empty
-    const remaining = await fs.readdir(path.dirname(file));
-    if (remaining.length === 0) await fs.rmdir(path.dirname(file));
   }
 }
 

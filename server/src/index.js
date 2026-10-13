@@ -49,6 +49,15 @@ api.delete('/icons/:folder/:name', async (req, res) => {
   res.status(204).end();
 });
 
+api.get('/icon-folders', async (req, res) => res.json(await storage.listIconFolders()));
+api.post('/icon-folders', async (req, res) => {
+  res.status(201).json(await storage.createIconFolder(req.body?.name));
+});
+api.delete('/icon-folders/:folder', async (req, res) => {
+  await storage.deleteIconFolder(req.params.folder);
+  res.status(204).end();
+});
+
 api.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
 // eslint-disable-next-line no-unused-vars

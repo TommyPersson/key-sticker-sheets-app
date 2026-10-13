@@ -87,6 +87,7 @@ export default function App() {
   /** Sheet ids using each sticker, as last reported by the server */
   const [stickerRefs, setStickerRefs] = useState<Record<string, string[]>>({});
   const [icons, setIcons] = useState<IconInfo[]>([]);
+  const [iconFolders, setIconFolders] = useState<string[]>([]);
   const [selection, setSelection] = useState<Selection>(null);
   /** Library sticker whose placements are highlighted on the sheet */
   const [highlightStickerId, setHighlightStickerId] = useState<string | null>(null);
@@ -132,7 +133,13 @@ export default function App() {
   }, [ws.flush]);
 
   const refreshIcons = useCallback(() => {
-    api.listIcons().then(setIcons, (e) => showError(`Could not load icons: ${e.message}`));
+    Promise.all([api.listIcons(), api.listIconFolders()]).then(
+      ([list, folders]) => {
+        setIcons(list);
+        setIconFolders(folders);
+      },
+      (e) => showError(`Could not load icons: ${e.message}`),
+    );
   }, [showError]);
 
   const openSheet = useCallback(
@@ -703,6 +710,7 @@ export default function App() {
         <IconPicker
           open={pickerOpen}
           icons={icons}
+          folders={iconFolders}
           value={selectedSticker.icon}
           onClose={() => setPickerOpen(false)}
           onSelect={(icon) => {
@@ -717,6 +725,7 @@ export default function App() {
       <IconPicker
         open={iconLibraryOpen}
         icons={icons}
+        folders={iconFolders}
         onClose={() => setIconLibraryOpen(false)}
         usage={iconUsage}
         onIconsChanged={refreshIcons}

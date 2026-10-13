@@ -1,8 +1,6 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Autocomplete,
   Box,
-  Button,
   ButtonBase,
   Chip,
   Dialog,
@@ -23,12 +21,16 @@ import BlockIcon from '@mui/icons-material/Block';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/FolderOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolderOutlined';
+import CheckIcon from '@mui/icons-material/Check';
 import { api, iconUrl } from '../api';
 import type { IconInfo } from '../types';
 
 interface Props {
   open: boolean;
   icons: IconInfo[];
+  /** All icon folders, including empty ones */
+  folders: string[];
   /** The selected icon. Without onSelect, the dialog only manages the icon library. */
   value?: string;
   onClose: () => void;
@@ -38,6 +40,13 @@ interface Props {
   onIconsChanged: () => void;
   onError: (message: string) => void;
 }
+
+/** Grid of icon tiles */
+const GRID = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
+  gap: 1,
+} as const;
 
 const COLLAPSED_KEY = 'ks-icon-folders-collapsed';
 
@@ -51,7 +60,7 @@ function readCollapsed(): Set<string> {
   }
 }
 
-export function IconPicker({ open, icons, value = '', onClose, onSelect, usage, onIconsChanged, onError }: Props) {
+export function IconPicker({ open, icons, folders: folderList, value = '', onClose, onSelect, usage, onIconsChanged, onError }: Props) {
   const [search, setSearch] = useState('');
   const [folder, setFolder] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -69,27 +78,67 @@ export function IconPicker({ open, icons, value = '', onClose, onSelect, usage, 
       // storage unavailable
     }
   };
-  const [uploadFolder, setUploadFolder] = useState('custom');
+  // Folder that files are being dragged over
+  const [dropFolder, setDropFolder] = useState<string | null>(null);
+  // Name typed for a new folder; null while not creating one
+  const [newFolder, setNewFolder] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const folders = useMemo(() => [...new Set(icons.map((i) => i.folder))].sort(), [icons]);
+  const folders = useMemo(
+    () => [...new Set([...folderList, ...icons.map((i) => i.folder)])].sort((a, b) => a.localeCompare(b)),
+    [folderList, icons],
+  );
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return icons.filter((i) => (!folder || i.folder === folder) && (!q || i.path.toLowerCase().includes(q)));
   }, [icons, search, folder]);
 
-  // Sections per folder, in the order of the folder chips
+  // Sections per folder, in the order of the folder chips. Empty folders show unless searching.
+  const searching = search.trim() !== '';
   const groups = useMemo(
     () =>
       folders
+        .filter((name) => !folder || name === folder)
         .map((name) => [name, filtered.filter((i) => i.folder === name)] as const)
-        .filter(([, members]) => members.length > 0),
-    [folders, filtered],
+        .filter(([, members]) => members.length > 0 || !searching),
+    [folders, folder, filtered, searching],
   );
+
+  const createFolder = async () => {
+    const name = newFolder?.trim();
+    if (!name) return setNewFolder(null);
+    try {
+      await api.createIconFolder(name);
+      setNewFolder(null);
+      setFolder(name);
+      onIconsChanged();
+    } catch (e) {
+      onError(`Could not create folder: ${(e as Error).message}`);
+    }
+  };
+
+  const deleteFolder = async (name: string) => {
+    try {
+      await api.deleteIconFolder(name);
+      if (folder === name) setFolder(null);
+      onIconsChanged();
+    } catch (e) {
+      onError(`Could not delete folder: ${(e as Error).message}`);
+    }
+  };
+
+  // Folder the file chooser was opened for
+  const uploadTarget = useRef('custom');
+  const chooseFiles = (target: string) => {
+    uploadTarget.current = target;
+    fileInput.current?.click();
+  };
 
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
-    const target = uploadFolder.trim() || 'custom';
+    const target = uploadTarget.current;
+    // Show the new icons, even in a collapsed folder
+    if (collapsed.has(target)) toggleFolder(target);
     let last: IconInfo | null = null;
     for (const file of Array.from(files)) {
       try {
@@ -148,106 +197,211 @@ export function IconPicker({ open, icons, value = '', onClose, onSelect, usage, 
           {folders.map((f) => (
             <Chip key={f} label={f} color={folder === f ? 'primary' : 'default'} onClick={() => setFolder(f)} />
           ))}
+          {newFolder === null ? (
+            <Chip
+              icon={<CreateNewFolderIcon />}
+              label="Create folder"
+              variant="outlined"
+              onClick={() => setNewFolder('')}
+            />
+          ) : (
+            <TextField
+              size="small"
+              placeholder="Folder name"
+              value={newFolder}
+              onChange={(e) => setNewFolder(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') createFolder();
+                if (e.key === 'Escape') {
+                  // Cancels the new folder, not the dialog
+                  e.stopPropagation();
+                  setNewFolder(null);
+                }
+              }}
+              onBlur={() => !newFolder?.trim() && setNewFolder(null)}
+              autoFocus
+              sx={{ width: 180, '& .MuiInputBase-input': { py: 0.5 } }}
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton size="small" edge="end" onClick={createFolder} aria-label="Create folder">
+                        <CheckIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          )}
         </Stack>
 
+        {/* Each folder section accepts dropped files; drops anywhere else are ignored */}
         <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
-            gap: 1,
-            alignContent: 'start',
-            overflowY: 'auto',
-            flex: 1,
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'none';
           }}
+          onDrop={(e) => e.preventDefault()}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto', flex: 1 }}
         >
           {onSelect && (
-            <IconTile label="No icon" selected={!value} onClick={() => onSelect?.('')}>
-              <BlockIcon sx={{ color: 'text.disabled' }} />
-            </IconTile>
+            <Box sx={GRID}>
+              <IconTile label="No icon" selected={!value} onClick={() => onSelect?.('')}>
+                <BlockIcon sx={{ color: 'text.disabled' }} />
+              </IconTile>
+            </Box>
           )}
           {groups.map(([name, members]) => (
-            <Fragment key={name}>
-              <ButtonBase
-                onClick={() => toggleFolder(name)}
-                aria-expanded={!collapsed.has(name)}
+            <Box
+              key={name}
+              onDragOver={(e) => {
+                if (!e.dataTransfer.types.includes('Files')) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+                setDropFolder(name);
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropFolder(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDropFolder(null);
+                uploadTarget.current = name;
+                upload(e.dataTransfer.files);
+              }}
+              sx={{
+                position: 'relative',
+                // Drawn over the section, so the sticky header can't cover it
+                '&::after': {
+                  content: '""',
+                  display: dropFolder === name ? 'block' : 'none',
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 2,
+                  pointerEvents: 'none',
+                  borderRadius: 1,
+                  border: 2,
+                  borderStyle: 'dashed',
+                  borderColor: 'primary.main',
+                  bgcolor: 'action.hover',
+                },
+              }}
+            >
+              <Stack
+                direction="row"
                 sx={{
-                  gridColumn: '1 / -1',
                   position: 'sticky',
                   top: 0,
                   zIndex: 1,
-                  justifyContent: 'flex-start',
-                  gap: 0.75,
-                  py: 0.5,
+                  alignItems: 'center',
                   bgcolor: 'background.paper',
                   borderBottom: 1,
                   borderColor: 'divider',
-                  '&:hover': { bgcolor: 'action.hover' },
                 }}
               >
-                <ExpandMoreIcon
+                <ButtonBase
+                  onClick={() => toggleFolder(name)}
+                  aria-expanded={!collapsed.has(name)}
                   sx={{
-                    fontSize: 18,
-                    color: 'action.active',
-                    transform: collapsed.has(name) ? 'rotate(-90deg)' : 'none',
-                    transition: 'transform 0.15s',
+                    flex: 1,
+                    alignSelf: 'stretch',
+                    justifyContent: 'flex-start',
+                    gap: 0.75,
+                    py: 0.5,
+                    pr: 1,
+                    '&:hover': { bgcolor: 'action.hover' },
                   }}
-                />
-                <FolderIcon sx={{ fontSize: 16, color: 'action.active' }} />
-                <Typography variant="caption" sx={{ fontWeight: 600, flex: 1, textAlign: 'left' }}>
-                  {name}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {members.length}
-                </Typography>
-              </ButtonBase>
-              {!collapsed.has(name) &&
-                members.map((icon) => (
-                  <IconTile
-                    key={icon.path}
-                    label={icon.name.replace(/\.[a-z]+$/i, '')}
-                    title={icon.path}
-                    selected={icon.path === value}
-                    onClick={onSelect && (() => onSelect(icon.path))}
-                    onDelete={() => remove(icon)}
-                  >
-                    <img src={iconUrl(icon.path)} alt="" style={{ maxWidth: 24, maxHeight: 24 }} />
-                  </IconTile>
-                ))}
-            </Fragment>
+                >
+                  <ExpandMoreIcon
+                    sx={{
+                      fontSize: 18,
+                      color: 'action.active',
+                      transform: collapsed.has(name) ? 'rotate(-90deg)' : 'none',
+                      transition: 'transform 0.15s',
+                    }}
+                  />
+                  <FolderIcon sx={{ fontSize: 16, color: 'action.active' }} />
+                  <Typography variant="caption" sx={{ fontWeight: 600, flex: 1, textAlign: 'left' }}>
+                    {name}
+                  </Typography>
+                  <Typography variant="caption" color={dropFolder === name ? 'primary' : 'text.secondary'}>
+                    {dropFolder === name ? `Drop to upload to ${name}` : members.length}
+                  </Typography>
+                </ButtonBase>
+                {!icons.some((i) => i.folder === name) && (
+                  <Tooltip title={`Delete empty folder ${name}`}>
+                    <IconButton size="small" onClick={() => deleteFolder(name)} aria-label={`Delete folder ${name}`}>
+                      <DeleteIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title={`Upload icons to ${name}`}>
+                  <IconButton size="small" onClick={() => chooseFiles(name)} aria-label={`Upload icons to ${name}`}>
+                    <UploadIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+              {!collapsed.has(name) && (
+                <Box sx={{ ...GRID, pt: 1 }}>
+                  {members.map((icon) => (
+                    <IconTile
+                      key={icon.path}
+                      label={icon.name.replace(/\.[a-z]+$/i, '')}
+                      title={icon.path}
+                      selected={icon.path === value}
+                      onClick={onSelect && (() => onSelect(icon.path))}
+                      onDelete={() => remove(icon)}
+                    >
+                      <img src={iconUrl(icon.path)} alt="" style={{ maxWidth: 24, maxHeight: 24 }} />
+                    </IconTile>
+                  ))}
+                  {members.length === 0 && (
+                    <ButtonBase
+                      onClick={() => chooseFiles(name)}
+                      sx={{
+                        gridColumn: '1 / -1',
+                        flexDirection: 'column',
+                        gap: 0.5,
+                        py: 2,
+                        borderRadius: 1,
+                        border: 1,
+                        borderStyle: 'dashed',
+                        borderColor: 'divider',
+                        color: 'text.secondary',
+                        '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main', color: 'primary.main' },
+                      }}
+                    >
+                      <UploadIcon />
+                      <Typography variant="body2">Upload icons</Typography>
+                      <Typography variant="caption">Empty folder. Click to choose files, or drop them here.</Typography>
+                    </ButtonBase>
+                  )}
+                </Box>
+              )}
+            </Box>
           ))}
         </Box>
-        {filtered.length === 0 && (
+        {searching && filtered.length === 0 && (
           <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
             No icons match.
           </Typography>
         )}
       </DialogContent>
-      <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Autocomplete
-            freeSolo
-            size="small"
-            options={folders}
-            inputValue={uploadFolder}
-            onInputChange={(_, v) => setUploadFolder(v)}
-            sx={{ width: 180 }}
-            renderInput={(params) => <TextField {...params} label="Upload to folder" />}
-          />
-          <Button startIcon={<UploadIcon />} variant="outlined" onClick={() => fileInput.current?.click()}>
-            Upload icons
-          </Button>
-          <input
-            ref={fileInput}
-            type="file"
-            hidden
-            multiple
-            accept=".svg,.png,.jpg,.jpeg,.webp,.gif"
-            onChange={(e) => {
-              upload(e.target.files);
-              e.target.value = '';
-            }}
-          />
-        </Stack>
+      <DialogActions sx={{ px: 3 }}>
+        <input
+          ref={fileInput}
+          type="file"
+          hidden
+          multiple
+          accept=".svg,.png,.jpg,.jpeg,.webp,.gif"
+          onChange={(e) => {
+            upload(e.target.files);
+            e.target.value = '';
+          }}
+        />
         <Typography variant="caption" color="text.secondary">
           {filtered.length} icons
         </Typography>

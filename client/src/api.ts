@@ -35,6 +35,10 @@ export const api = {
     request<{ affectedSheets: string[] }>(`/api/stickers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   listIcons: () => request<IconInfo[]>('/api/icons'),
+  listIconFolders: () => request<string[]>('/api/icon-folders'),
+  createIconFolder: (name: string) => request<string>('/api/icon-folders', json('POST', { name })),
+  deleteIconFolder: (name: string) =>
+    request<void>(`/api/icon-folders/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   uploadIcon: (folder: string, file: File) =>
     request<IconInfo>(`/api/icons/${encodeURIComponent(folder)}/${encodeURIComponent(file.name)}`, {
       method: 'PUT',
