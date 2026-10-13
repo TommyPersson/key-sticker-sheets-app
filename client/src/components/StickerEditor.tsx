@@ -58,10 +58,6 @@ export function StickerEditor({
 
   return (
     <Stack spacing={2}>
-      <Typography variant="overline" color="text.secondary">
-        {placement ? `Sticker ${placement.index + 1} of ${placement.count} on this sheet` : 'Library sticker'}
-      </Typography>
-
       {/* Live preview at up to 2x physical size */}
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
         <Paper variant="outlined" sx={{ zoom: previewZoom, bgcolor: '#fff', color: '#000' }}>

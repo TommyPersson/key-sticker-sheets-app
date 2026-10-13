@@ -11,8 +11,6 @@ import {
   Paper,
   Snackbar,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Toolbar,
   Tooltip,
@@ -25,11 +23,15 @@ import RedoIcon from '@mui/icons-material/Redo';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
+import DescriptionIcon from '@mui/icons-material/Description';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import { api } from './api';
 import { SheetList } from './components/SheetList';
 import { Library } from './components/Library';
+import { FloatingPane, paneClearance } from './components/FloatingPane';
 import { StickerEditor, type PlacementActions } from './components/StickerEditor';
 import { IconPicker } from './components/IconPicker';
 import { StickerSheetEditor, StickerSheetPrint, perPage } from './components/StickerSheet';
@@ -39,10 +41,14 @@ import { contentKey, parseImport, toSheetFile } from './importExport';
 import { useWorkspace, type SaveStatus } from './useWorkspace';
 import type { IconInfo, LibrarySticker, Sheet, SheetItem, SheetSummary, Sticker } from './types';
 
-const SIDEBAR_WIDTH = 280;
+const SHEETS_WIDTH = 260;
+const LIBRARY_WIDTH = 290;
 const EDITOR_WIDTH = 340;
+/** Space between the editor and the library pane (px) */
+const EDITOR_GAP = 12;
+/** Height of a minimized pane's button (px) */
+const MINIMIZED_PANE_HEIGHT = 36;
 
-type SidebarTab = 'sheets' | 'library';
 /** A sticker placed on the open sheet, or a sticker picked in the library */
 type Selection = { kind: 'item'; id: string } | { kind: 'sticker'; id: string } | null;
 
@@ -78,7 +84,8 @@ export default function App() {
   const [stickerRefs, setStickerRefs] = useState<Record<string, string[]>>({});
   const [icons, setIcons] = useState<IconInfo[]>([]);
   const [selection, setSelection] = useState<Selection>(null);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(() => stored('ks-sidebar', 'sheets'));
+  const [sheetsOpen, setSheetsOpen] = useState(() => stored('ks-sheets-pane', 'open') === 'open');
+  const [libraryOpen, setLibraryOpen] = useState(() => stored('ks-library', 'open') === 'open');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', '1.25')) || 1.25);
   const [message, setMessage] = useState<{ text: string; severity: 'error' | 'success' } | null>(null);
@@ -98,7 +105,8 @@ export default function App() {
   const { sheet, stickers, edit } = ws;
 
   useEffect(() => store('ks-zoom', String(zoom)), [zoom]);
-  useEffect(() => store('ks-sidebar', sidebarTab), [sidebarTab]);
+  useEffect(() => store('ks-sheets-pane', sheetsOpen ? 'open' : 'closed'), [sheetsOpen]);
+  useEffect(() => store('ks-library', libraryOpen ? 'open' : 'closed'), [libraryOpen]);
 
   // ---------- Loading ----------
 
@@ -411,58 +419,9 @@ export default function App() {
       </AppBar>
 
       <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Sheets and library */}
-        <Paper
-          square
-          elevation={0}
-          sx={{
-            width: SIDEBAR_WIDTH,
-            borderRight: 1,
-            borderColor: 'divider',
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <Tabs value={sidebarTab} onChange={(_, v) => setSidebarTab(v)} variant="fullWidth" sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tab value="sheets" label={`Sheets${sheets ? ` (${sheets.length})` : ''}`} />
-            <Tab value="library" label={`Library (${Object.keys(stickers).length})`} />
-          </Tabs>
-          <Box sx={{ flex: 1, minHeight: 0 }}>
-            {sheets === null ? (
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : sidebarTab === 'sheets' ? (
-              <SheetList
-                sheets={sheets}
-                selectedId={sheet?.id ?? null}
-                onSelect={openSheet}
-                onCreate={() => createSheet()}
-                onImport={importSheet}
-                onDuplicate={duplicateSheet}
-                onExport={exportSheet}
-                onDelete={deleteSheet}
-              />
-            ) : (
-              <Library
-                stickers={stickers}
-                dimensions={dimensions}
-                onSheet={onSheet}
-                sheetCount={sheetCount}
-                hasSheet={!!sheet}
-                selectedId={selectedSticker?.id ?? null}
-                onSelect={(id) => setSelection({ kind: 'sticker', id })}
-                onCreate={() => createSticker()}
-                onAddToSheet={(id) => place(id, items.length)}
-              />
-            )}
-          </Box>
-        </Paper>
-
-        {/* Sheet canvas */}
-        {sheet ? (
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Workspace */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {sheet && (
             <Paper
               square
               elevation={0}
@@ -531,76 +490,158 @@ export default function App() {
                 Print
               </Button>
             </Paper>
+          )}
 
-            <Box
-              sx={{ flex: 1, overflow: 'auto', bgcolor: 'grey.200', p: 3 }}
-              onClick={(e) => e.target === e.currentTarget && setSelection(null)}
-            >
-              <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
-                {items.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit, drag to
-                reorder, drag from the library to add
-              </Typography>
-              <Stack spacing={3} sx={{ zoom, width: 'fit-content', mx: 'auto' }}>
-                <StickerSheetEditor
-                  sheet={sheet}
-                  stickers={stickers}
-                  selectedId={selectedItem?.id ?? null}
-                  onSelect={(id) => setSelection({ kind: 'item', id })}
-                  onAppend={() => createSticker(items.length)}
-                  onMove={moveItem}
-                  onInsert={place}
-                />
-              </Stack>
-            </Box>
-            <StickerSheetPrint sheet={sheet} stickers={stickers} />
-          </Box>
-        ) : (
-          <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', color: 'text.secondary' }}>
-            {sheets?.length === 0 ? (
-              <Stack spacing={2} sx={{ alignItems: 'center' }}>
-                <Typography>Create your first sticker sheet to get started.</Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => createSheet()}>
-                  New sheet
-                </Button>
-              </Stack>
+          <Box sx={{ flex: 1, minHeight: 0, position: 'relative', bgcolor: 'grey.200' }}>
+            {sheet ? (
+              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                {/* Stays in place while the sheet scrolls; padded like the canvas to stay clear of the panes */}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  component="div"
+                  sx={{
+                    pt: 3,
+                    pb: 1,
+                    pl: paneClearance(sheetsOpen, SHEETS_WIDTH),
+                    pr: paneClearance(libraryOpen, LIBRARY_WIDTH),
+                  }}
+                >
+                  {items.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit, drag to
+                  reorder, drag from the library to add
+                </Typography>
+                <Box
+                  sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflow: 'auto',
+                    pb: 3,
+                    // Keep the sheet clear of the floating panes
+                    pl: paneClearance(sheetsOpen, SHEETS_WIDTH),
+                    pr: paneClearance(libraryOpen, LIBRARY_WIDTH),
+                  }}
+                  onClick={(e) => e.target === e.currentTarget && setSelection(null)}
+                >
+                  <Stack spacing={3} sx={{ zoom, width: 'fit-content', mx: 'auto' }}>
+                    <StickerSheetEditor
+                      sheet={sheet}
+                      stickers={stickers}
+                      selectedId={selectedItem?.id ?? null}
+                      onSelect={(id) => setSelection({ kind: 'item', id })}
+                      onAppend={() => createSticker(items.length)}
+                      onMove={moveItem}
+                      onInsert={place}
+                    />
+                  </Stack>
+                </Box>
+              </Box>
             ) : (
-              sheets && <Typography>Select a sheet.</Typography>
-            )}
-          </Box>
-        )}
-
-        {/* Sticker editor */}
-        {(sheet || selectedSticker) && (
-          <Paper
-            square
-            elevation={0}
-            sx={{ width: EDITOR_WIDTH, borderLeft: 1, borderColor: 'divider', p: 2, overflowY: 'auto', flexShrink: 0 }}
-          >
-            {selectedSticker ? (
-              <StickerEditor
-                key={selection?.id}
-                sticker={selectedSticker}
-                dimensions={dimensions}
-                usedOn={usedOnIds(selectedSticker.id).map(sheetName)}
-                placement={placement}
-                onAddToSheet={
-                  selection?.kind === 'sticker' && sheet ? () => place(selectedSticker.id, items.length) : undefined
-                }
-                onChange={(patch) =>
-                  updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)
-                }
-                onChooseIcon={() => setPickerOpen(true)}
-                onDeleteFromLibrary={() => deleteFromLibrary(selectedSticker.id)}
-              />
-            ) : (
-              <Box sx={{ color: 'text.secondary', textAlign: 'center', mt: 6 }}>
-                <Typography variant="body2">Select a sticker to edit it,</Typography>
-                <Typography variant="body2">click an empty slot to create one,</Typography>
-                <Typography variant="body2">or drag one in from the library.</Typography>
+              <Box
+                sx={{
+                  height: '100%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  color: 'text.secondary',
+                  pl: paneClearance(sheetsOpen, SHEETS_WIDTH),
+                  pr: paneClearance(libraryOpen, LIBRARY_WIDTH),
+                }}
+              >
+                {sheets?.length === 0 ? (
+                  <Stack spacing={2} sx={{ alignItems: 'center' }}>
+                    <Typography>Create your first sticker sheet to get started.</Typography>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => createSheet()}>
+                      New sheet
+                    </Button>
+                  </Stack>
+                ) : (
+                  sheets && <Typography>Select a sheet.</Typography>
+                )}
               </Box>
             )}
-          </Paper>
-        )}
+
+            {/* Floating panes */}
+            <FloatingPane
+              title={`Sheets${sheets ? ` (${sheets.length})` : ''}`}
+              icon={<DescriptionIcon />}
+              side="left"
+              width={SHEETS_WIDTH}
+              open={sheetsOpen}
+              onOpenChange={setSheetsOpen}
+            >
+              {sheets === null ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <SheetList
+                  sheets={sheets}
+                  selectedId={sheet?.id ?? null}
+                  onSelect={openSheet}
+                  onCreate={() => createSheet()}
+                  onImport={importSheet}
+                  onDuplicate={duplicateSheet}
+                  onExport={exportSheet}
+                  onDelete={deleteSheet}
+                />
+              )}
+            </FloatingPane>
+            <FloatingPane
+              title={`Library (${Object.keys(stickers).length})`}
+              icon={<CollectionsBookmarkIcon />}
+              side="right"
+              width={LIBRARY_WIDTH}
+              open={libraryOpen}
+              onOpenChange={setLibraryOpen}
+            >
+              <Library
+                stickers={stickers}
+                dimensions={dimensions}
+                onSheet={onSheet}
+                sheetCount={sheetCount}
+                hasSheet={!!sheet}
+                selectedId={selectedSticker?.id ?? null}
+                onSelect={(id) => setSelection({ kind: 'sticker', id })}
+                onCreate={() => createSticker()}
+                onAddToSheet={(id) => place(id, items.length)}
+              />
+            </FloatingPane>
+            <FloatingPane
+              title={placement ? `Sticker ${placement.index + 1} of ${placement.count}` : 'Library sticker'}
+              icon={<EditIcon />}
+              side="right"
+              width={EDITOR_WIDTH}
+              // Next to the library, or below its button when it's minimized
+              offset={libraryOpen ? LIBRARY_WIDTH + EDITOR_GAP : 0}
+              topOffset={libraryOpen ? 0 : MINIMIZED_PANE_HEIGHT + EDITOR_GAP}
+              open={!!selectedSticker}
+              onOpenChange={(open) => !open && setSelection(null)}
+              dismiss="close"
+              fitContent
+            >
+              {selectedSticker && (
+                <Box sx={{ p: 2 }}>
+                  <StickerEditor
+                    key={selection?.id}
+                    sticker={selectedSticker}
+                    dimensions={dimensions}
+                    usedOn={usedOnIds(selectedSticker.id).map(sheetName)}
+                    placement={placement}
+                    onAddToSheet={
+                      selection?.kind === 'sticker' && sheet ? () => place(selectedSticker.id, items.length) : undefined
+                    }
+                    onChange={(patch) =>
+                      updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)
+                    }
+                    onChooseIcon={() => setPickerOpen(true)}
+                    onDeleteFromLibrary={() => deleteFromLibrary(selectedSticker.id)}
+                  />
+                </Box>
+              )}
+            </FloatingPane>
+          </Box>
+          {sheet && <StickerSheetPrint sheet={sheet} stickers={stickers} />}
+        </Box>
+
       </Box>
 
       {selectedSticker && (

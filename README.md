@@ -37,7 +37,8 @@ During development, data is stored in `server/data`.
 
 ## Features
 
-- **Sticker library**: every sticker lives in one global library, and sheets place stickers from it. A sticker can be placed several times and on several sheets, and editing it updates every placement. The library tab has search and filters (on this sheet, not on this sheet, unused). Drag a sticker onto the sheet to insert it before the slot you drop it on, or onto an empty slot to append it; double-click to append.
+- The sheet list and the sticker library are panels floating over the left and right of the workspace. Minimize either one to a button when you need the room. Selecting a sticker opens its editor in a floating panel next to the library; close it with ✕ or Esc.
+- **Sticker library**: every sticker lives in one global library, and sheets place stickers from it. A sticker can be placed several times and on several sheets, and editing it updates every placement. The library has search and filters (on this sheet, not on this sheet, unused). Drag a sticker onto the sheet to insert it before the slot you drop it on, or onto an empty slot to append it; double-click to append.
 - Stickers selected on a sheet can be removed from that sheet (they stay in the library) or turned into a separate copy, to vary one placement without changing the others. Deleting a sticker from the library also removes it from every sheet that uses it, after a confirmation that names those sheets.
 - Multiple sheets: create, duplicate (the copy places the same library stickers), delete, export to JSON, and import JSON (either an exported sheet or the PoC's array format). Exported files embed the full stickers, so they work in another installation. Importing reuses identical library stickers and adds the rest.
 - WYSIWYG preview in physical units (26×17 mm cells, 2 mm gaps, corner registration markers), the same as the PoC
