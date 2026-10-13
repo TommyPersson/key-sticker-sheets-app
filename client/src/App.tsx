@@ -8,13 +8,13 @@ import {
   CircularProgress,
   Divider,
   IconButton,
-  Paper,
   Snackbar,
   Stack,
   TextField,
   Toolbar,
   Tooltip,
   Typography,
+  alpha,
 } from '@mui/material';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import PrintIcon from '@mui/icons-material/Print';
@@ -410,51 +410,33 @@ export default function App() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppBar position="static" elevation={0}>
-        <Toolbar variant="dense" sx={{ gap: 1.5 }}>
+        <Toolbar variant="dense" sx={{ gap: 1.5, flexWrap: 'wrap', py: 0.5, ...onBlue }}>
           <KeyboardIcon />
-          <Typography variant="h6" sx={{ fontSize: 18 }}>
+          <Typography variant="h6" sx={{ fontSize: 18, whiteSpace: 'nowrap' }}>
             Key Sticker Sheets
           </Typography>
-        </Toolbar>
-      </AppBar>
-
-      <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Workspace */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {sheet && (
-            <Paper
-              square
-              elevation={0}
-              sx={{
-                px: 2,
-                py: 1,
-                borderBottom: 1,
-                borderColor: 'divider',
-                display: 'flex',
-                gap: 2,
-                alignItems: 'center',
-                flexWrap: 'wrap',
-              }}
-            >
+            <>
+              <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
               <TextField
                 variant="standard"
                 value={sheet.name}
-                onChange={(e) => edit((w) => w.sheet ? { ...w, sheet: { ...w.sheet, name: e.target.value } } : w, 'name')}
-                slotProps={{ htmlInput: { 'aria-label': 'Sheet name', style: { fontSize: 18, fontWeight: 500 } } }}
-                sx={{ minWidth: 200, flex: '0 1 320px' }}
+                onChange={(e) => edit((w) => (w.sheet ? { ...w, sheet: { ...w.sheet, name: e.target.value } } : w), 'name')}
+                slotProps={{ htmlInput: { 'aria-label': 'Sheet name', style: { fontSize: 16, fontWeight: 500 } } }}
+                sx={{ minWidth: 180, flex: '0 1 300px' }}
               />
               <SaveIndicator status={ws.status} />
               <Box sx={{ flex: 1 }} />
               <Tooltip title="Undo (Ctrl+Z)">
                 <span>
-                  <IconButton onClick={ws.undo} disabled={!ws.canUndo}>
+                  <IconButton color="inherit" onClick={ws.undo} disabled={!ws.canUndo}>
                     <UndoIcon />
                   </IconButton>
                 </span>
               </Tooltip>
               <Tooltip title="Redo (Ctrl+Y)">
                 <span>
-                  <IconButton onClick={ws.redo} disabled={!ws.canRedo}>
+                  <IconButton color="inherit" onClick={ws.redo} disabled={!ws.canRedo}>
                     <RedoIcon />
                   </IconButton>
                 </span>
@@ -463,58 +445,67 @@ export default function App() {
               <PageSetup
                 settings={sheet.settings}
                 onChange={(patch, key) =>
-                  edit((w) => (w.sheet ? { ...w, sheet: { ...w.sheet, settings: { ...w.sheet.settings, ...patch } } } : w), key)
+                  edit(
+                    (w) => (w.sheet ? { ...w, sheet: { ...w.sheet, settings: { ...w.sheet.settings, ...patch } } } : w),
+                    key,
+                  )
                 }
               />
               <Divider orientation="vertical" flexItem />
               <Stack direction="row" sx={{ alignItems: 'center' }}>
-                <IconButton onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))} aria-label="Zoom out">
+                <IconButton
+                  color="inherit"
+                  onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                  aria-label="Zoom out"
+                >
                   <ZoomOutIcon />
                 </IconButton>
                 <Typography variant="body2" sx={{ width: 44, textAlign: 'center' }}>
                   {Math.round(zoom * 100)}%
                 </Typography>
-                <IconButton onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))} aria-label="Zoom in">
+                <IconButton
+                  color="inherit"
+                  onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                  aria-label="Zoom in"
+                >
                   <ZoomInIcon />
                 </IconButton>
               </Stack>
               <Tooltip title="Create a new sticker in the library and place it on this sheet">
                 <Button
+                  color="inherit"
                   startIcon={<AddIcon />}
                   onClick={() => createSticker(selectedIndex >= 0 ? selectedIndex + 1 : items.length)}
                 >
                   New sticker
                 </Button>
               </Tooltip>
-              <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()} disabled={!items.length}>
+              <Button
+                variant="contained"
+                startIcon={<PrintIcon />}
+                onClick={() => window.print()}
+                disabled={!items.length}
+                sx={{ bgcolor: 'common.white', color: 'primary.main', '&:hover': { bgcolor: 'grey.100' } }}
+              >
                 Print
               </Button>
-            </Paper>
+            </>
           )}
+        </Toolbar>
+      </AppBar>
 
+      <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* Workspace */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Box sx={{ flex: 1, minHeight: 0, position: 'relative', bgcolor: 'grey.200' }}>
             {sheet ? (
-              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* Stays in place while the sheet scrolls; padded like the canvas to stay clear of the panes */}
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  component="div"
-                  sx={{
-                    pt: 3,
-                    pb: 1,
-                    pl: paneClearance(sheetsOpen, SHEETS_WIDTH),
-                    pr: paneClearance(libraryOpen, LIBRARY_WIDTH),
-                  }}
-                >
-                  {items.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit, drag to
-                  reorder, drag from the library to add
-                </Typography>
+              <>
                 <Box
                   sx={{
-                    flex: 1,
-                    minHeight: 0,
+                    height: '100%',
                     overflow: 'auto',
+                    // Room for the floating help line above the sheet
+                    pt: 6.5,
                     pb: 3,
                     // Keep the sheet clear of the floating panes
                     pl: paneClearance(sheetsOpen, SHEETS_WIDTH),
@@ -534,7 +525,29 @@ export default function App() {
                     />
                   </Stack>
                 </Box>
-              </Box>
+                {/* Floats over the canvas so it stays put while the sheet scrolls underneath */}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  component="div"
+                  sx={{
+                    position: 'absolute',
+                    top: (t) => t.spacing(3),
+                    left: paneClearance(sheetsOpen, SHEETS_WIDTH),
+                    maxWidth: (t) =>
+                      `calc(100% - ${paneClearance(sheetsOpen, SHEETS_WIDTH)(t)} - ${paneClearance(libraryOpen, LIBRARY_WIDTH)(t)})`,
+                    px: 1,
+                    py: 0.25,
+                    ml: -1,
+                    borderRadius: 1,
+                    bgcolor: (t) => alpha(t.palette.grey[200], 0.85),
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {items.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit, drag to
+                  reorder, drag from the library to add
+                </Typography>
+              </>
             ) : (
               <Box
                 sx={{
@@ -673,8 +686,27 @@ export default function App() {
   );
 }
 
+/** Light-on-blue styling for controls placed in the app bar */
+const onBlue = {
+  '& .MuiInput-root': { color: 'inherit' },
+  '& .MuiInput-underline:before': { borderBottomColor: 'rgba(255, 255, 255, 0.4)' },
+  '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottomColor: 'rgba(255, 255, 255, 0.8)' },
+  '& .MuiInput-underline:after': { borderBottomColor: 'common.white' },
+  '& .MuiIconButton-root.Mui-disabled': { color: 'rgba(255, 255, 255, 0.35)' },
+  '& .MuiDivider-root': { borderColor: 'rgba(255, 255, 255, 0.3)' },
+} as const;
+
 function SaveIndicator({ status }: { status: SaveStatus }) {
   if (status === 'error') return <Chip size="small" color="error" icon={<CloudOffIcon />} label="Not saved" />;
-  if (status === 'saved') return <Chip size="small" variant="outlined" icon={<CloudDoneIcon />} label="Saved" />;
-  return <Chip size="small" variant="outlined" icon={<CircularProgress size={14} />} label="Saving…" />;
+  const light = { color: 'inherit', borderColor: 'rgba(255, 255, 255, 0.5)', '& .MuiChip-icon': { color: 'inherit' } };
+  if (status === 'saved') return <Chip size="small" variant="outlined" icon={<CloudDoneIcon />} label="Saved" sx={light} />;
+  return (
+    <Chip
+      size="small"
+      variant="outlined"
+      icon={<CircularProgress size={14} color="inherit" />}
+      label="Saving…"
+      sx={light}
+    />
+  );
 }

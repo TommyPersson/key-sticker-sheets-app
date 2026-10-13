@@ -2,8 +2,8 @@ import { Box, Button, IconButton, Paper, Stack, Tooltip, Typography, type Theme 
 import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import CloseIcon from '@mui/icons-material/Close';
 
-/** Distance between floating panes and the workspace edges, in theme spacing units */
-export const PANE_INSET = 1.5;
+/** Distance between floating panes and the workspace edges, in theme spacing units (clears the canvas scrollbar) */
+export const PANE_INSET = 3;
 
 interface Props {
   title: string;
