@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import PrintIcon from '@mui/icons-material/Print';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
@@ -46,13 +47,14 @@ import { useWorkspace, type SaveStatus } from './useWorkspace';
 import type { IconInfo, LibrarySticker, Sheet, SheetItem, SheetSummary, Sticker } from './types';
 
 const SHEETS_WIDTH = 260;
-/** Fits three columns of library cards, including the scrollbar */
-const LIBRARY_WIDTH = 400;
+/** Width a library card column takes: the card (see Library) plus the gap */
+const LIBRARY_COLUMN_WIDTH = 120;
+/** Library pane width for a number of card columns, including padding and the scrollbar */
+const libraryWidth = (columns: number) => 40 + columns * LIBRARY_COLUMN_WIDTH;
+const LIBRARY_COLUMNS = { min: 2, max: 8, default: 3 };
 const EDITOR_WIDTH = 340;
 /** Space between the editor and the library pane (px) */
 const EDITOR_GAP = 12;
-/** Height of a minimized pane's button (px) */
-const MINIMIZED_PANE_HEIGHT = 36;
 
 /** A sticker placed on the open sheet, or a sticker picked in the library */
 type Selection = { kind: 'item'; id: string } | { kind: 'sticker'; id: string } | null;
@@ -92,10 +94,13 @@ export default function App() {
   const [selection, setSelection] = useState<Selection>(null);
   /** Library sticker whose placements are highlighted on the sheet */
   const [highlightStickerId, setHighlightStickerId] = useState<string | null>(null);
-  const [sheetsOpen, setSheetsOpen] = useState(() => stored('ks-sheets-pane', 'open') === 'open');
-  const [libraryOpen, setLibraryOpen] = useState(() => stored('ks-library', 'open') === 'open');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [iconLibraryOpen, setIconLibraryOpen] = useState(false);
+  const [libraryColumns, setLibraryColumns] = useState(() => {
+    const n = Number(stored('ks-library-columns', String(LIBRARY_COLUMNS.default)));
+    return n >= LIBRARY_COLUMNS.min && n <= LIBRARY_COLUMNS.max ? n : LIBRARY_COLUMNS.default;
+  });
+  const libraryPaneWidth = libraryWidth(libraryColumns);
   const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', '1.25')) || 1.25);
   const [message, setMessage] = useState<{ text: string; severity: 'error' | 'success' } | null>(null);
 
@@ -114,8 +119,7 @@ export default function App() {
   const { sheet, stickers, edit } = ws;
 
   useEffect(() => store('ks-zoom', String(zoom)), [zoom]);
-  useEffect(() => store('ks-sheets-pane', sheetsOpen ? 'open' : 'closed'), [sheetsOpen]);
-  useEffect(() => store('ks-library', libraryOpen ? 'open' : 'closed'), [libraryOpen]);
+  useEffect(() => store('ks-library-columns', String(libraryColumns)), [libraryColumns]);
 
   // ---------- Loading ----------
 
@@ -280,12 +284,23 @@ export default function App() {
     });
   };
 
-  const removeSelectedItem = () => {
-    if (!selectedItem) return;
-    const next = items[selectedIndex + 1] ?? items[selectedIndex - 1] ?? null;
-    setItems((list) => list.filter((i) => i.id !== selectedItem.id));
-    setSelection(next ? { kind: 'item', id: next.id } : null);
+  const swapItems = (a: number, b: number) => {
+    setItems((list) => {
+      const copy = [...list];
+      [copy[a], copy[b]] = [copy[b], copy[a]];
+      return copy;
+    });
   };
+
+  /** Takes a placement off the sheet; the sticker stays in the library */
+  const removeItem = (id: string) => {
+    if (selectedItem?.id === id) {
+      const next = items[selectedIndex + 1] ?? items[selectedIndex - 1] ?? null;
+      setSelection(next ? { kind: 'item', id: next.id } : null);
+    }
+    setItems((list) => list.filter((i) => i.id !== id));
+  };
+  const removeSelectedItem = () => selectedItem && removeItem(selectedItem.id);
 
   /** Points the selected placement at a new copy of its sticker, so it can be edited separately */
   const makeCopy = () => {
@@ -572,8 +587,8 @@ export default function App() {
                     pt: 6.5,
                     pb: 3,
                     // Keep the sheet clear of the floating panes
-                    pl: paneClearance(sheetsOpen, SHEETS_WIDTH),
-                    pr: paneClearance(libraryOpen, LIBRARY_WIDTH),
+                    pl: paneClearance(SHEETS_WIDTH),
+                    pr: paneClearance(libraryPaneWidth),
                   }}
                   onClick={(e) => e.target === e.currentTarget && setSelection(null)}
                 >
@@ -586,7 +601,9 @@ export default function App() {
                       onSelect={(id) => setSelection({ kind: 'item', id })}
                       onAppend={() => createSticker(items.length)}
                       onMove={moveItem}
+                      onSwap={swapItems}
                       onInsert={place}
+                      onRemove={removeItem}
                     />
                   </Stack>
                 </Box>
@@ -598,9 +615,9 @@ export default function App() {
                   sx={{
                     position: 'absolute',
                     top: (t) => t.spacing(3),
-                    left: paneClearance(sheetsOpen, SHEETS_WIDTH),
+                    left: paneClearance(SHEETS_WIDTH),
                     maxWidth: (t) =>
-                      `calc(100% - ${paneClearance(sheetsOpen, SHEETS_WIDTH)(t)} - ${paneClearance(libraryOpen, LIBRARY_WIDTH)(t)})`,
+                      `calc(100% - ${paneClearance(SHEETS_WIDTH)(t)} - ${paneClearance(libraryPaneWidth)(t)})`,
                     px: 1,
                     py: 0.25,
                     ml: -1,
@@ -609,8 +626,8 @@ export default function App() {
                     pointerEvents: 'none',
                   }}
                 >
-                  {items.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit, drag to
-                  reorder, drag from the library to add
+                  {items.length} stickers · {pageCount} page{pageCount === 1 ? '' : 's'} · click a slot to edit, drag onto
+                  another to swap or between two to move, drag from the library to add
                 </Typography>
               </>
             ) : (
@@ -620,8 +637,8 @@ export default function App() {
                   display: 'grid',
                   placeItems: 'center',
                   color: 'text.secondary',
-                  pl: paneClearance(sheetsOpen, SHEETS_WIDTH),
-                  pr: paneClearance(libraryOpen, LIBRARY_WIDTH),
+                  pl: paneClearance(SHEETS_WIDTH),
+                  pr: paneClearance(libraryPaneWidth),
                 }}
               >
                 {sheets?.length === 0 ? (
@@ -643,8 +660,6 @@ export default function App() {
               icon={<DescriptionIcon />}
               side="left"
               width={SHEETS_WIDTH}
-              open={sheetsOpen}
-              onOpenChange={setSheetsOpen}
             >
               {sheets === null ? (
                 <Box sx={{ p: 4, textAlign: 'center' }}>
@@ -667,9 +682,16 @@ export default function App() {
               title={`Library (${Object.keys(stickers).length})`}
               icon={<CollectionsBookmarkIcon />}
               side="right"
-              width={LIBRARY_WIDTH}
-              open={libraryOpen}
-              onOpenChange={setLibraryOpen}
+              width={libraryPaneWidth}
+              // Snaps to whole card columns
+              onResize={(width) =>
+                setLibraryColumns(
+                  Math.min(
+                    LIBRARY_COLUMNS.max,
+                    Math.max(LIBRARY_COLUMNS.min, Math.round((width - libraryWidth(0)) / LIBRARY_COLUMN_WIDTH)),
+                  ),
+                )
+              }
               actions={
                 <Tooltip title="Icon library">
                   <IconButton size="small" onClick={() => setIconLibraryOpen(true)} aria-label="Open icon library">
@@ -694,9 +716,8 @@ export default function App() {
               <FloatingColumn
                 side="right"
                 width={EDITOR_WIDTH}
-                // Next to the library, or below its button when it's minimized
-                offset={libraryOpen ? LIBRARY_WIDTH + EDITOR_GAP : 0}
-                topOffset={libraryOpen ? 0 : MINIMIZED_PANE_HEIGHT + EDITOR_GAP}
+                // Next to the library
+                offset={libraryPaneWidth + EDITOR_GAP}
               >
                 <FloatingPane
                   inline
@@ -704,10 +725,20 @@ export default function App() {
                   icon={<EditIcon />}
                   side="right"
                   width={EDITOR_WIDTH}
-                  open
-                  onOpenChange={(open) => !open && setSelection(null)}
-                  dismiss="close"
+                  onClose={() => setSelection(null)}
                   fitContent
+                  actions={
+                    <Tooltip title="Delete from library">
+                      <IconButton
+                        size="small"
+                        onClick={() => deleteFromLibrary(selectedSticker.id)}
+                        aria-label="Delete from library"
+                        sx={{ '&:hover': { color: 'error.main' } }}
+                      >
+                        <DeleteForeverIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  }
                 >
                   <Box sx={{ p: 2 }}>
                     <StickerEditor
@@ -722,7 +753,6 @@ export default function App() {
                         updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)
                       }
                       onChooseIcon={() => setPickerOpen(true)}
-                      onDeleteFromLibrary={() => deleteFromLibrary(selectedSticker.id)}
                     />
                   </Box>
                 </FloatingPane>
@@ -733,8 +763,6 @@ export default function App() {
                     icon={<GridViewIcon />}
                     side="right"
                     width={EDITOR_WIDTH}
-                    open
-                    dismiss="none"
                     fitContent
                   >
                     <Box sx={{ px: 2, py: 1.5 }}>

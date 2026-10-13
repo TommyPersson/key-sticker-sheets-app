@@ -1,5 +1,5 @@
-import { Box, Button, IconButton, Paper, Stack, Tooltip, Typography, type Theme } from '@mui/material';
-import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
+import { useRef } from 'react';
+import { Box, IconButton, Paper, Stack, Tooltip, Typography, type Theme } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 /** Distance between floating panes and the workspace edges, in theme spacing units (clears the canvas scrollbar) */
@@ -29,21 +29,17 @@ interface Props extends Anchor {
   title: string;
   icon: React.ReactNode;
   width: number;
-  open: boolean;
-  onOpenChange?: (open: boolean) => void;
+  /** Shows a close button; the parent decides whether the pane is rendered */
+  onClose?: () => void;
   children: React.ReactNode;
-  /**
-   * 'minimize' collapses the pane to a button that reopens it (the default);
-   * 'close' hides it entirely, and the parent decides when it opens;
-   * 'none' shows no button.
-   */
-  dismiss?: 'minimize' | 'close' | 'none';
   /** Size to the content (up to the available height) instead of filling the height */
   fitContent?: boolean;
   /** Placed inside a FloatingColumn instead of positioning itself */
   inline?: boolean;
   /** Extra buttons in the title bar, before the dismiss button */
   actions?: React.ReactNode;
+  /** Makes the inner edge draggable; called with the width the drag asks for (px) */
+  onResize?: (width: number) => void;
 }
 
 /**
@@ -55,33 +51,18 @@ export function FloatingPane({
   icon,
   side,
   width,
-  open,
-  onOpenChange,
+  onClose,
   children,
   offset,
   topOffset,
-  dismiss = 'minimize',
   fitContent = false,
   inline = false,
   actions,
+  onResize,
 }: Props) {
+  // Pointer position and pane width when the resize drag started
+  const resizeStart = useRef<{ x: number; width: number } | null>(null);
   const position = inline ? {} : anchorStyle({ side, offset, topOffset });
-
-  if (!open) {
-    if (dismiss !== 'minimize') return null;
-    return (
-      <Button
-        variant="contained"
-        color="inherit"
-        startIcon={icon}
-        onClick={() => onOpenChange?.(true)}
-        sx={{ ...position, bgcolor: 'background.paper' }}
-      >
-        {title}
-      </Button>
-    );
-  }
-
   const name = title.replace(/\s*\(.*\)$/, '').toLowerCase();
   const height = inline
     ? { minHeight: 0, flex: fitContent ? '0 1 auto' : 1 }
@@ -101,6 +82,37 @@ export function FloatingPane({
         overflow: 'hidden',
       }}
     >
+      {onResize && (
+        <Box
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize ${name}`}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            resizeStart.current = { x: e.clientX, width };
+          }}
+          onPointerMove={(e) => {
+            const start = resizeStart.current;
+            if (!start) return;
+            // The inner edge faces the workspace: dragging towards it widens the pane
+            const delta = side === 'right' ? start.x - e.clientX : e.clientX - start.x;
+            onResize(start.width + delta);
+          }}
+          onPointerUp={() => (resizeStart.current = null)}
+          onPointerCancel={() => (resizeStart.current = null)}
+          sx={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            [side === 'right' ? 'left' : 'right']: 0,
+            width: 6,
+            zIndex: 2,
+            cursor: 'ew-resize',
+            '&:hover, &:active': { bgcolor: 'primary.main', opacity: 0.4 },
+          }}
+        />
+      )}
       <Stack
         direction="row"
         sx={{
@@ -119,14 +131,10 @@ export function FloatingPane({
           {title}
         </Typography>
         {actions}
-        {dismiss !== 'none' && (
-          <Tooltip title={dismiss === 'close' ? 'Close (Esc)' : `Minimize ${name}`}>
-            <IconButton
-              size="small"
-              onClick={() => onOpenChange?.(false)}
-              aria-label={`${dismiss === 'close' ? 'Close' : 'Minimize'} ${name}`}
-            >
-              {dismiss === 'close' ? <CloseIcon fontSize="small" /> : <CloseFullscreenIcon fontSize="small" />}
+        {onClose && (
+          <Tooltip title="Close (Esc)">
+            <IconButton size="small" onClick={onClose} aria-label={`Close ${name}`}>
+              <CloseIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         )}
@@ -156,6 +164,5 @@ export function FloatingColumn({ width, children, ...anchor }: Anchor & { width:
   );
 }
 
-/** Horizontal padding that keeps workspace content clear of an open pane */
-export const paneClearance = (open: boolean, width: number) => (t: Theme) =>
-  open ? `calc(${width}px + ${t.spacing(PANE_INSET + 3)})` : t.spacing(3);
+/** Horizontal padding that keeps workspace content clear of a pane */
+export const paneClearance = (width: number) => (t: Theme) => `calc(${width}px + ${t.spacing(PANE_INSET + 3)})`;

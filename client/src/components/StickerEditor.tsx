@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
 import { Alert, Autocomplete, Box, Button, Divider, Stack, TextField, Typography } from '@mui/material';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import ImageIcon from '@mui/icons-material/Image';
 import { StickerFace, sheetCssVars } from './StickerSheet';
 import type { SheetDimensions, Sticker } from '../types';
@@ -14,7 +13,6 @@ interface Props {
   categories: string[];
   onChange: (patch: Partial<Sticker>) => void;
   onChooseIcon: () => void;
-  onDeleteFromLibrary: () => void;
 }
 
 const PX_PER_MM = 96 / 25.4;
@@ -22,7 +20,7 @@ const PX_PER_MM = 96 / 25.4;
 const PREVIEW_MAX_WIDTH = 290;
 
 /** Edits a library sticker. Changes apply wherever the sticker is placed. */
-export function StickerEditor({ sticker, dimensions, usedOn, categories, onChange, onChooseIcon, onDeleteFromLibrary }: Props) {
+export function StickerEditor({ sticker, dimensions, usedOn, categories, onChange, onChooseIcon }: Props) {
   // Type-ahead completion to select once the completed value has rendered
   const completion = useRef<{ input: HTMLInputElement; start: number; end: number } | null>(null);
   useLayoutEffect(() => {
@@ -134,20 +132,9 @@ export function StickerEditor({ sticker, dimensions, usedOn, categories, onChang
 
       <Divider />
 
-      <Box>
-        <Typography variant="caption" color="text.secondary" component="div">
-          {usedOn.length === 0 ? 'Not used on any sheet.' : `Used on: ${usedOn.join(', ')}`}
-        </Typography>
-        <Button
-          size="small"
-          color="error"
-          startIcon={<DeleteForeverIcon />}
-          onClick={onDeleteFromLibrary}
-          sx={{ mt: 0.5, ml: -0.5 }}
-        >
-          Delete from library
-        </Button>
-      </Box>
+      <Typography variant="caption" color="text.secondary" component="div">
+        {usedOn.length === 0 ? 'Not used on any sheet.' : `Used on: ${usedOn.join(', ')}`}
+      </Typography>
     </Stack>
   );
 }

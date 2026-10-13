@@ -128,6 +128,13 @@
 
 /* ---------- Editor-only affordances (never printed) ---------- */
 
+/* Lifts the on-screen paper off the workspace background */
+.ks-paper-preview {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
 .ks-interactive .ks-item {
   cursor: pointer;
   border: 0.2mm dashed #c5ccd6;
@@ -201,6 +208,65 @@
   color: #b0bec5;
   font-weight: normal;
   font-style: italic;
+}
+
+/* Drop target between two stickers (positioned inline): dropping there inserts instead of swapping */
+.ks-interactive .ks-gap {
+  position: absolute;
+  z-index: 1;
+}
+
+.ks-interactive .ks-gap.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -0.5mm;
+  bottom: -0.5mm;
+  width: 0.8mm;
+  transform: translateX(-50%);
+  border-radius: 0.4mm;
+  background: #ff9800;
+}
+
+/* Quick remove button, in the bottom-right corner that sticker content leaves free */
+.ks-interactive .ks-item .ks-remove {
+  position: absolute;
+  right: 0.8mm;
+  bottom: 0.8mm;
+  width: 4mm;
+  height: 4mm;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0.2mm solid #b0bec5;
+  border-radius: 50%;
+  background: #fff;
+  color: #546e7a;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: auto;
+}
+
+.ks-interactive .ks-item .ks-remove svg {
+  width: 3mm;
+  height: 3mm;
+}
+
+.ks-interactive .ks-item:hover .ks-remove,
+.ks-interactive .ks-item.selected .ks-remove,
+.ks-interactive .ks-item .ks-remove:focus-visible {
+  opacity: 1;
+}
+
+.ks-interactive .ks-item .ks-remove:hover {
+  border-color: #d32f2f;
+  background: #d32f2f;
+  color: #fff;
+}
+
+.ks-interactive .ks-item.dragging .ks-remove {
+  display: none;
 }
 
 /* ---------- Printing ---------- */

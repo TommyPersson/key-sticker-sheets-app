@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import CloseIcon from '@mui/icons-material/Close';
 import { iconUrl } from '../api';
 import { dimensionsOf, gridFor, mm, paperSize } from '../paper';
 import type { Sheet, SheetDimensions, SheetItem, SheetSettings, Sticker } from '../types';
@@ -49,12 +50,15 @@ function Paper({
   page,
   pageCount,
   interactive,
+  overlay,
   children,
 }: {
   sheet: Sheet;
   page: number;
   pageCount: number;
   interactive?: boolean;
+  /** Absolutely positioned elements over the sheet, in its coordinates */
+  overlay?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const { settings } = sheet;
@@ -66,7 +70,7 @@ function Paper({
   if (settings.outlines) classes.push('outlines');
   return (
     <div
-      className="ks-paper"
+      className={`ks-paper${interactive ? ' ks-paper-preview' : ''}`}
       style={{
         width: `${paper.width}mm`,
         // When printing, stay a hair under the page height so rounding never spills onto a blank page
@@ -85,6 +89,7 @@ function Paper({
           </>
         )}
         <div className="ks-grid">{children}</div>
+        {overlay}
       </div>
       <PageInfo sheet={sheet} page={page} pageCount={pageCount} />
     </div>
@@ -135,8 +140,12 @@ interface InteractiveProps {
   onSelect: (itemId: string) => void;
   onAppend: () => void;
   onMove: (from: number, to: number) => void;
+  /** A sticker was dropped on another: they trade places */
+  onSwap: (a: number, b: number) => void;
   /** A library sticker was dropped: insert it at this index */
   onInsert: (stickerId: string, index: number) => void;
+  /** Takes the placement off the sheet */
+  onRemove: (itemId: string) => void;
 }
 
 type Drop = { slot: number; mode: 'move' | 'insert' } | null;
@@ -150,7 +159,9 @@ export function StickerSheetEditor({
   onSelect,
   onAppend,
   onMove,
+  onSwap,
   onInsert,
+  onRemove,
 }: InteractiveProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [drop, setDrop] = useState<Drop>(null);
@@ -158,22 +169,74 @@ export function StickerSheetEditor({
   const size = perPage(sheet.settings);
   const count = sheet.items.length;
 
+  // Insertion index of the gap being dragged over
+  const [gapDrop, setGapDrop] = useState<number | null>(null);
+  const grid = gridFor(sheet.settings);
+  const d = dimensionsOf(sheet.settings);
+
   const endDrag = () => {
     setDragIndex(null);
     setDrop(null);
+    setGapDrop(null);
   };
+
+  /** Drop targets in the gaps between stickers, where a drop inserts instead of swapping */
+  const gaps = (pageIndex: number) =>
+    Array.from({ length: grid.rows }, (_, row) =>
+      Array.from({ length: grid.columns + 1 }, (_, column) => {
+        const at = pageIndex * size + row * grid.columns + column - sheet.settings.skip;
+        if (at < 0 || at > count) return null;
+        // A move that would leave the dragged sticker where it is
+        const noop = dragIndex !== null && (at === dragIndex || at === dragIndex + 1);
+        const width = d.gapX + 1.5;
+        return (
+          <div
+            key={`${row}-${column}`}
+            className={`ks-gap${gapDrop === at && !noop ? ' active' : ''}`}
+            style={{
+              left: `${d.sheetPadding + column * (d.cellWidth + d.gapX) - d.gapX / 2 - width / 2}mm`,
+              top: `${d.sheetPadding + row * (d.cellHeight + d.gapY)}mm`,
+              width: `${width}mm`,
+              height: `${d.cellHeight}mm`,
+            }}
+            onDragOver={(e) => {
+              if (dragIndex !== null ? noop : !e.dataTransfer.types.includes(LIBRARY_DRAG_TYPE)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = dragIndex !== null ? 'move' : 'copy';
+              setDrop(null);
+              setGapDrop(at);
+            }}
+            onDragLeave={() => setGapDrop((g) => (g === at ? null : g))}
+            onDrop={(e) => {
+              e.preventDefault();
+              const stickerId = e.dataTransfer.getData(LIBRARY_DRAG_TYPE);
+              if (dragIndex !== null) onMove(dragIndex, at > dragIndex ? at - 1 : at);
+              else if (stickerId) onInsert(stickerId, at);
+              endDrag();
+            }}
+          />
+        );
+      }),
+    );
 
   return (
     <>
       {pages.map((slots, pageIndex) => (
-        <Paper key={pageIndex} sheet={sheet} page={pageIndex + 1} pageCount={pages.length} interactive>
+        <Paper
+          key={pageIndex}
+          sheet={sheet}
+          page={pageIndex + 1}
+          pageCount={pages.length}
+          interactive
+          overlay={gaps(pageIndex)}
+        >
           {slots.map((slot, i) => {
             const slotNumber = i + pageIndex * size;
             const key = slot.kind === 'sticker' ? slot.item.id : `${pageIndex}-${i}`;
             if (slot.kind === 'skipped') {
               return <div key={key} className="ks-item skipped" title="Skipped (already used) slot" />;
             }
-            // Moving onto an empty slot moves to the end; inserting there appends
+            // Dropping on a sticker swaps the two; on an empty slot moves to the end. Inserting there appends
             const moveTarget = slot.kind === 'sticker' ? slot.index : count - 1;
             const insertTarget = slot.kind === 'sticker' ? slot.index : count;
 
@@ -207,10 +270,12 @@ export function StickerSheetEditor({
                   if (dragIndex !== null) {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
+                    setGapDrop(null);
                     setDrop({ slot: slotNumber, mode: 'move' });
                   } else if (e.dataTransfer.types.includes(LIBRARY_DRAG_TYPE)) {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'copy';
+                    setGapDrop(null);
                     setDrop({ slot: slotNumber, mode: 'insert' });
                   }
                 }}
@@ -219,7 +284,10 @@ export function StickerSheetEditor({
                   e.preventDefault();
                   const stickerId = e.dataTransfer.getData(LIBRARY_DRAG_TYPE);
                   if (dragIndex !== null) {
-                    if (moveTarget !== dragIndex) onMove(dragIndex, moveTarget);
+                    if (moveTarget !== dragIndex) {
+                      if (slot.kind === 'sticker') onSwap(dragIndex, slot.index);
+                      else onMove(dragIndex, moveTarget);
+                    }
                   } else if (stickerId) {
                     onInsert(stickerId, insertTarget);
                   }
@@ -227,7 +295,24 @@ export function StickerSheetEditor({
                 }}
                 onDragEnd={endDrag}
               >
-                {slot.kind === 'sticker' && <StickerFace sticker={slot.sticker} placeholder />}
+                {slot.kind === 'sticker' && (
+                  <>
+                    <StickerFace sticker={slot.sticker} placeholder />
+                    <button
+                      type="button"
+                      className="ks-remove"
+                      title="Remove from sheet"
+                      aria-label="Remove from sheet"
+                      draggable={false}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(slot.item.id);
+                      }}
+                    >
+                      <CloseIcon />
+                    </button>
+                  </>
+                )}
               </div>
             );
           })}
