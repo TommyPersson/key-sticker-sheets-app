@@ -42,6 +42,8 @@ interface Props extends Anchor {
   fitContent?: boolean;
   /** Placed inside a FloatingColumn instead of positioning itself */
   inline?: boolean;
+  /** Extra buttons in the title bar, before the dismiss button */
+  actions?: React.ReactNode;
 }
 
 /**
@@ -61,6 +63,7 @@ export function FloatingPane({
   dismiss = 'minimize',
   fitContent = false,
   inline = false,
+  actions,
 }: Props) {
   const position = inline ? {} : anchorStyle({ side, offset, topOffset });
 
@@ -115,6 +118,7 @@ export function FloatingPane({
         <Typography variant="subtitle2" sx={{ flex: 1 }}>
           {title}
         </Typography>
+        {actions}
         {dismiss !== 'none' && (
           <Tooltip title={dismiss === 'close' ? 'Close (Esc)' : `Minimize ${name}`}>
             <IconButton

@@ -26,6 +26,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
+import ImageIcon from '@mui/icons-material/Image';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
@@ -92,6 +93,7 @@ export default function App() {
   const [sheetsOpen, setSheetsOpen] = useState(() => stored('ks-sheets-pane', 'open') === 'open');
   const [libraryOpen, setLibraryOpen] = useState(() => stored('ks-library', 'open') === 'open');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [iconLibraryOpen, setIconLibraryOpen] = useState(false);
   const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', '1.25')) || 1.25);
   const [message, setMessage] = useState<{ text: string; severity: 'error' | 'success' } | null>(null);
 
@@ -186,6 +188,7 @@ export default function App() {
   const items = sheet?.items ?? [];
   const dimensions = sheet ? dimensionsOf(sheet.settings) : DEFAULT_DIMENSIONS;
 
+  const iconUsage = (path: string) => Object.values(stickers).filter((s) => s.icon === path).length;
   const onSheet = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of items) counts.set(item.stickerId, (counts.get(item.stickerId) ?? 0) + 1);
@@ -301,9 +304,9 @@ export default function App() {
       } else if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
         ws.flush();
-      } else if (!typing && !pickerOpen && e.key === 'Escape') {
+      } else if (!typing && !pickerOpen && !iconLibraryOpen && e.key === 'Escape') {
         setSelection(null);
-      } else if (!typing && !pickerOpen && selectedItem && sheet) {
+      } else if (!typing && !pickerOpen && !iconLibraryOpen && selectedItem && sheet) {
         const cols = gridFor(sheet.settings).columns;
         const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols };
         if (e.key in moves) {
@@ -605,6 +608,13 @@ export default function App() {
               width={LIBRARY_WIDTH}
               open={libraryOpen}
               onOpenChange={setLibraryOpen}
+              actions={
+                <Tooltip title="Icon library">
+                  <IconButton size="small" onClick={() => setIconLibraryOpen(true)} aria-label="Open icon library">
+                    <ImageIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              }
             >
               <Library
                 stickers={stickers}
@@ -699,10 +709,19 @@ export default function App() {
             updateSticker(selectedSticker.id, { icon });
             setPickerOpen(false);
           }}
+          usage={iconUsage}
           onIconsChanged={refreshIcons}
           onError={showError}
         />
       )}
+      <IconPicker
+        open={iconLibraryOpen}
+        icons={icons}
+        onClose={() => setIconLibraryOpen(false)}
+        usage={iconUsage}
+        onIconsChanged={refreshIcons}
+        onError={showError}
+      />
 
       <Snackbar
         open={!!message}
