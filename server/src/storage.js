@@ -293,6 +293,51 @@ export class Storage {
     return { path: `${folder}/${name}`, folder, name };
   }
 
+  /**
+   * Renames an icon and/or moves it to another existing folder, keeping its file type,
+   * and updates the library stickers using it. Sheets refer to stickers, not icons, so they need no changes.
+   */
+  renameIcon(folder, name, newName = name, newFolder = folder) {
+    const from = this.iconFile(folder, name);
+    const to = this.iconFile(newFolder, newName);
+    if (path.extname(name).toLowerCase() !== path.extname(newName).toLowerCase()) {
+      throw new ValidationError('Renaming cannot change the file type');
+    }
+    return this.exclusive(async () => {
+      try {
+        await fs.access(from);
+      } catch {
+        throw new NotFoundError('Icon not found');
+      }
+      try {
+        await fs.access(path.dirname(to));
+      } catch {
+        throw new NotFoundError(`Folder "${newFolder}" not found`);
+      }
+      if (to !== from) {
+        try {
+          await fs.access(to);
+          throw new ValidationError(`An icon named "${newName}" already exists in ${newFolder}`);
+        } catch (e) {
+          if (e instanceof ValidationError) throw e;
+        }
+        await fs.rename(from, to);
+      }
+      const oldPath = `${folder}/${name}`;
+      const icon = { path: `${newFolder}/${newName}`, folder: newFolder, name: newName };
+      const library = await this.readLibrary();
+      const now = new Date().toISOString();
+      let updatedStickers = 0;
+      const updated = library.map((s) => {
+        if (s.icon !== oldPath) return s;
+        updatedStickers++;
+        return { ...s, icon: icon.path, updatedAt: now };
+      });
+      if (updatedStickers > 0) await writeJsonAtomic(this.libraryFile, updated);
+      return { icon, updatedStickers };
+    });
+  }
+
   async deleteIcon(folder, name) {
     const file = this.iconFile(folder, name);
     try {

@@ -8,6 +8,11 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputBase,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   InputAdornment,
   Stack,
   TextField,
@@ -23,6 +28,11 @@ import FolderIcon from '@mui/icons-material/FolderOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolderOutlined';
 import CheckIcon from '@mui/icons-material/Check';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DriveFileMoveIcon from '@mui/icons-material/DriveFileMoveOutlined';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { api, iconUrl } from '../api';
 import type { IconInfo } from '../types';
 
@@ -35,11 +45,18 @@ interface Props {
   value?: string;
   onClose: () => void;
   onSelect?: (path: string) => void;
+  /** Creates a library sticker using the icon */
+  onCreateSticker: (icon: IconInfo) => void;
+  /** Renames the icon's file (same type) and/or moves it to another folder; resolves to whether it succeeded */
+  onRename: (icon: IconInfo, target: { name?: string; folder?: string }) => Promise<boolean>;
   /** Number of library stickers using an icon, mentioned before deleting it */
   usage: (path: string) => number;
   onIconsChanged: () => void;
   onError: (message: string) => void;
 }
+
+const baseName = (file: string) => file.replace(/\.[a-z]+$/i, '');
+const extension = (file: string) => file.slice(baseName(file).length);
 
 /** Grid of icon tiles */
 const GRID = {
@@ -60,7 +77,7 @@ function readCollapsed(): Set<string> {
   }
 }
 
-export function IconPicker({ open, icons, folders: folderList, value = '', onClose, onSelect, usage, onIconsChanged, onError }: Props) {
+export function IconPicker({ open, icons, folders: folderList, value = '', onClose, onSelect, onCreateSticker, onRename, usage, onIconsChanged, onError }: Props) {
   const [search, setSearch] = useState('');
   const [folder, setFolder] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -349,11 +366,15 @@ export function IconPicker({ open, icons, folders: folderList, value = '', onClo
                   {members.map((icon) => (
                     <IconTile
                       key={icon.path}
-                      label={icon.name.replace(/\.[a-z]+$/i, '')}
+                      label={baseName(icon.name)}
                       title={icon.path}
                       selected={icon.path === value}
                       onClick={onSelect && (() => onSelect(icon.path))}
                       onDelete={() => remove(icon)}
+                      onCreateSticker={() => onCreateSticker(icon)}
+                      onRename={(base) => onRename(icon, { name: base + extension(icon.name) })}
+                      moveTargets={folders.filter((f) => f !== icon.folder)}
+                      onMove={(target) => onRename(icon, { folder: target })}
                     >
                       <img src={iconUrl(icon.path)} alt="" style={{ maxWidth: 24, maxHeight: 24 }} />
                     </IconTile>
@@ -410,7 +431,7 @@ export function IconPicker({ open, icons, folders: folderList, value = '', onClo
   );
 }
 
-/** An icon in the grid. The delete button appears while the tile is hovered or focused. */
+/** An icon in the grid. The tile's own buttons appear while it is hovered or focused. */
 function IconTile({
   children,
   label,
@@ -418,6 +439,10 @@ function IconTile({
   selected,
   onClick,
   onDelete,
+  onCreateSticker,
+  onRename,
+  moveTargets = [],
+  onMove,
 }: {
   children: React.ReactNode;
   label: string;
@@ -426,13 +451,48 @@ function IconTile({
   /** Omitted when there is nothing to choose for */
   onClick?: () => void;
   onDelete?: () => void;
+  onCreateSticker?: () => void;
+  /** Renames to a new label; resolves to whether it succeeded */
+  onRename?: (label: string) => Promise<boolean>;
+  /** Folders the icon can move to */
+  moveTargets?: string[];
+  onMove?: (folder: string) => void;
 }) {
+  // The new name while renaming; null otherwise
+  const [draft, setDraft] = useState<string | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  // The "Move to" item while its folder submenu is open
+  const [moveAnchor, setMoveAnchor] = useState<HTMLElement | null>(null);
+  const closeMenus = () => {
+    setMoveAnchor(null);
+    setMenuAnchor(null);
+  };
+  // Select the whole name when renaming starts, so typing replaces it
+  const editing = draft !== null;
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editing) input.current?.select();
+  }, [editing]);
+  // Enter and the blur that follows must not rename twice
+  const committing = useRef(false);
+  const commit = async () => {
+    const name = draft?.trim();
+    if (!name || name === label || !onRename) return setDraft(null);
+    if (committing.current) return;
+    committing.current = true;
+    try {
+      if (await onRename(name)) setDraft(null);
+    } finally {
+      committing.current = false;
+    }
+  };
+
   return (
     <Box
       sx={{
         position: 'relative',
-        '& .delete': { opacity: 0 },
-        '&:hover .delete, &:focus-within .delete': { opacity: 1 },
+        '& .tile-action': { opacity: 0 },
+        '&:hover .tile-action, &:focus-within .tile-action': { opacity: 1 },
       }}
     >
       <Tooltip title={title ?? label} enterDelay={600}>
@@ -461,19 +521,142 @@ function IconTile({
           </Typography>
         </ButtonBase>
       </Tooltip>
-      {onDelete && (
-        <Tooltip title="Delete icon">
+      {onCreateSticker && (
+        <Tooltip title="New sticker with this icon">
           <IconButton
-            className="delete"
+            className="tile-action"
             size="small"
-            color="error"
-            onClick={onDelete}
-            aria-label={`Delete ${title ?? label}`}
-            sx={{ position: 'absolute', top: 2, right: 2, p: 0.25, transition: 'opacity 0.15s' }}
+            color="primary"
+            onClick={onCreateSticker}
+            aria-label={`New sticker with ${title ?? label}`}
+            sx={{ position: 'absolute', top: 2, left: 2, p: 0.25, transition: 'opacity 0.15s' }}
           >
-            <DeleteIcon sx={{ fontSize: 16 }} />
+            <AddIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
+      )}
+      {(onRename || onDelete) && draft === null && (
+        <>
+          <IconButton
+            className={menuAnchor ? undefined : 'tile-action'}
+            size="small"
+            onClick={(e) => setMenuAnchor(e.currentTarget)}
+            aria-label={`More actions for ${title ?? label}`}
+            aria-haspopup="menu"
+            sx={{ position: 'absolute', top: 2, right: 2, p: 0.25, transition: 'opacity 0.15s' }}
+          >
+            <MoreVertIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+          <Menu
+            anchorEl={menuAnchor}
+            open={!!menuAnchor}
+            onClose={() => setMenuAnchor(null)}
+            // Focus belongs to the rename field afterwards, not back on the button
+            disableRestoreFocus
+          >
+            {onRename && (
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  setDraft(label);
+                }}
+              >
+                <ListItemIcon>
+                  <EditIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Rename</ListItemText>
+              </MenuItem>
+            )}
+            {onMove && (
+              <MenuItem
+                onClick={(e) => setMoveAnchor(e.currentTarget)}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') setMoveAnchor(e.currentTarget);
+                }}
+                disabled={moveTargets.length === 0}
+                aria-haspopup="menu"
+                aria-expanded={!!moveAnchor}
+              >
+                <ListItemIcon>
+                  <DriveFileMoveIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Move to</ListItemText>
+                <ChevronRightIcon fontSize="small" sx={{ ml: 2, color: 'action.active' }} />
+              </MenuItem>
+            )}
+            {onDelete && (
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  onDelete();
+                }}
+                sx={{ color: 'error.main' }}
+              >
+                <ListItemIcon>
+                  <DeleteIcon fontSize="small" color="error" />
+                </ListItemIcon>
+                <ListItemText>Delete</ListItemText>
+              </MenuItem>
+            )}
+          </Menu>
+          <Menu
+            anchorEl={moveAnchor}
+            open={!!moveAnchor}
+            onClose={() => setMoveAnchor(null)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft') setMoveAnchor(null);
+            }}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          >
+            {moveTargets.map((target) => (
+              <MenuItem
+                key={target}
+                onClick={() => {
+                  closeMenus();
+                  onMove?.(target);
+                }}
+              >
+                <ListItemIcon>
+                  <FolderIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>{target}</ListItemText>
+              </MenuItem>
+            ))}
+          </Menu>
+        </>
+      )}
+      {draft !== null && (
+        <InputBase
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') {
+              // Cancels the rename, not the dialog
+              e.stopPropagation();
+              setDraft(null);
+            }
+          }}
+          onBlur={commit}
+          inputRef={input}
+          autoFocus
+          slotProps={{ input: { 'aria-label': 'New icon name' } }}
+          sx={{
+            position: 'absolute',
+            left: 4,
+            right: 4,
+            bottom: 6,
+            zIndex: 1,
+            px: 0.5,
+            fontSize: 12,
+            bgcolor: 'background.paper',
+            border: 1,
+            borderColor: 'primary.main',
+            borderRadius: 0.5,
+            '& input': { p: 0.25 },
+          }}
+        />
       )}
     </Box>
   );

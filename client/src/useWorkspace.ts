@@ -191,6 +191,28 @@ export function useWorkspace(onSheetSaved: (sheet: Sheet) => void, onError: (mes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Applies an icon rename the server already performed, everywhere including undo history. */
+  const renameIcon = useCallback((from: string, to: string) => {
+    // The same sticker object maps to the same renamed object, so saved and current stay identical
+    const renamed = new Map<Sticker, Sticker>();
+    const map = (w: Workspace): Workspace => {
+      if (!Object.values(w.stickers).some((s) => s.icon === from)) return w;
+      const stickers = Object.fromEntries(
+        Object.entries(w.stickers).map(([id, s]) => {
+          if (s.icon !== from) return [id, s];
+          if (!renamed.has(s)) renamed.set(s, { ...s, icon: to });
+          return [id, renamed.get(s)!];
+        }),
+      );
+      return { ...w, stickers };
+    };
+    saved.current = map(saved.current);
+    past.current = past.current.map(map);
+    future.current = future.current.map(map);
+    apply(map(current.current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return {
     sheet: workspace.sheet,
     stickers: workspace.stickers,
@@ -202,6 +224,7 @@ export function useWorkspace(onSheetSaved: (sheet: Sheet) => void, onError: (mes
     redo,
     flush,
     forgetSticker,
+    renameIcon,
     canUndo: historySize.past > 0,
     canRedo: historySize.future > 0,
   };

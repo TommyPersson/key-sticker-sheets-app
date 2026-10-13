@@ -45,7 +45,7 @@ During development, data is stored in `server/data`.
 - **Page setup** for each sheet: paper size (A4, A5, A3, Letter, Legal), portrait or landscape, and every dimension in mm: sticker width and height, horizontal and vertical gaps, page margin, sheet padding, and the registration markers' inset and length (0 hides them). The defaults match the PoC. The grid adapts to fit as many stickers as the paper holds (A4 portrait with the defaults: 6×13). The preview shows the paper, and printing uses the same paper size.
 - Each page (preview and print) has two lines in its bottom margin: sheet name, paper and page number, then sticker size, gap, grid, page margin, and where the first sticker and the markers sit. Use them to check print scale and set up cutters.
 - Click a sticker to edit it, click an empty slot to create a new one, drag to reorder, arrow keys to move the selection, Delete to remove it from the sheet
-- Icon library grouped by collapsible folders, with search and folder filter. Create (and delete empty) folders, upload into a folder from its header or by dropping files on it, and delete icons on hover. Open it from the sticker editor to choose an icon, or from the image button in the library title bar to manage icons.
+- Icon library grouped by collapsible folders, with search and folder filter. Create (and delete empty) folders, upload into a folder from its header or by dropping files on it, and rename, move to another folder or delete icons from their hover menu (renaming and moving update the stickers using the icon). Open it from the sticker editor to choose an icon, or from the image button in the library title bar to manage icons.
 - **Skip slots** (in page setup): leaves the first N slots empty so you can reuse partially used sticker paper
 - **Outlines** (in page setup): optionally prints a thin border around each sticker
 - Autosave (debounced), undo/redo for sheet layout and sticker edits (Ctrl+Z / Ctrl+Y), Ctrl+S to save right away. Undoing the creation of a sticker removes it from the sheet but leaves it in the library, where the Unused filter finds it.
@@ -63,6 +63,7 @@ During development, data is stored in `server/data`.
 | DELETE | `/api/stickers/:id` | delete a library sticker and remove it from all sheets |
 | GET | `/api/icons` | list icons |
 | PUT | `/api/icons/:folder/:name` | upload an icon (raw request body) |
+| POST | `/api/icons/:folder/:name/rename` | rename and/or move an icon (`{ "name": "new.svg", "folder": "other" }`, both optional), updating stickers that use it |
 | DELETE | `/api/icons/:folder/:name` | delete an icon |
 | GET | `/api/icon-folders` | list icon folders, including empty ones |
 | POST | `/api/icon-folders` | create an empty folder (`{ "name": "..." }`) |

@@ -44,6 +44,10 @@ api.put(
     res.status(201).json(await storage.saveIcon(req.params.folder, req.params.name, req.body));
   },
 );
+api.post('/icons/:folder/:name/rename', async (req, res) => {
+  const { name, folder } = req.body ?? {};
+  res.json(await storage.renameIcon(req.params.folder, req.params.name, name, folder));
+});
 api.delete('/icons/:folder/:name', async (req, res) => {
   await storage.deleteIcon(req.params.folder, req.params.name);
   res.status(204).end();

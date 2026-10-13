@@ -235,8 +235,8 @@ export default function App() {
   };
 
   /** Creates a sticker in the library and, when a position is given, places it on the sheet (one undo step) */
-  const createSticker = (at?: number) => {
-    const sticker = blankSticker();
+  const createSticker = (at?: number, content: Partial<Sticker> = {}) => {
+    const sticker = { ...blankSticker(), ...content };
     const item = newItem(sticker.id);
     edit((w) => ({
       stickers: { ...w.stickers, [sticker.id]: sticker },
@@ -246,6 +246,27 @@ export default function App() {
           : w.sheet,
     }));
     setSelection(at !== undefined && sheet ? { kind: 'item', id: item.id } : { kind: 'sticker', id: sticker.id });
+  };
+
+  /** Creates a library sticker from an icon, named after it, and opens it in the editor */
+  const createStickerWithIcon = (icon: IconInfo) => {
+    createSticker(undefined, { icon: icon.path, line1: icon.name.replace(/\.[a-z]+$/i, '') });
+    setPickerOpen(false);
+    setIconLibraryOpen(false);
+  };
+
+  /** Renames and/or moves an icon file; the server also updates the stickers using it */
+  const renameIcon = async (icon: IconInfo, target: { name?: string; folder?: string }) => {
+    try {
+      await ws.flush();
+      const result = await api.renameIcon(icon, target);
+      ws.renameIcon(icon.path, result.icon.path);
+      refreshIcons();
+      return true;
+    } catch (e) {
+      showError(`Could not ${target.folder ? 'move' : 'rename'} icon: ${(e as Error).message}`);
+      return false;
+    }
   };
 
   const moveItem = (from: number, to: number) => {
@@ -717,6 +738,8 @@ export default function App() {
             updateSticker(selectedSticker.id, { icon });
             setPickerOpen(false);
           }}
+          onCreateSticker={createStickerWithIcon}
+          onRename={renameIcon}
           usage={iconUsage}
           onIconsChanged={refreshIcons}
           onError={showError}
@@ -727,6 +750,8 @@ export default function App() {
         icons={icons}
         folders={iconFolders}
         onClose={() => setIconLibraryOpen(false)}
+        onCreateSticker={createStickerWithIcon}
+        onRename={renameIcon}
         usage={iconUsage}
         onIconsChanged={refreshIcons}
         onError={showError}

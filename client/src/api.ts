@@ -45,6 +45,12 @@ export const api = {
       headers: { 'Content-Type': file.type || 'application/octet-stream' },
       body: file,
     }),
+  /** Renames and/or moves an icon to another folder */
+  renameIcon: (icon: IconInfo, target: { name?: string; folder?: string }) =>
+    request<{ icon: IconInfo; updatedStickers: number }>(
+      `/api/icons/${encodeURIComponent(icon.folder)}/${encodeURIComponent(icon.name)}/rename`,
+      json('POST', target),
+    ),
   deleteIcon: (icon: IconInfo) =>
     request<void>(`/api/icons/${encodeURIComponent(icon.folder)}/${encodeURIComponent(icon.name)}`, {
       method: 'DELETE',
