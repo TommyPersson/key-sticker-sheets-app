@@ -1,8 +1,9 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Box, Button, Chip, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, ButtonBase, Chip, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import LabelIcon from '@mui/icons-material/LabelOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { StickerFace, LIBRARY_DRAG_TYPE, sheetCssVars } from './StickerSheet';
 import type { SheetDimensions, Sticker } from '../types';
 
@@ -32,6 +33,18 @@ export const categoriesOf = (stickers: Record<string, Sticker>) =>
   [...new Set(Object.values(stickers).map((s) => s.category.trim()).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: 'base' }),
   );
+const COLLAPSED_KEY = 'ks-library-collapsed';
+
+/** Collapsed category sections ('' for no category), remembered in this browser */
+function readCollapsed(): Set<string> {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]');
+    return new Set(Array.isArray(stored) ? stored.filter((c) => typeof c === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
 const sortKey = (s: Sticker) => `${s.line1} ${s.line2}`.trim().toLowerCase() || '￿';
 
 export function Library({
@@ -48,6 +61,17 @@ export function Library({
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [chosenCategory, setChosenCategory] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const toggleCategory = (name: string) => {
+    const next = new Set(collapsed);
+    if (!next.delete(name)) next.add(name);
+    setCollapsed(next);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
+    } catch {
+      // storage unavailable
+    }
+  };
 
   const categories = useMemo(() => categoriesOf(stickers), [stickers]);
   // Forget a category once no sticker has it any more
@@ -157,31 +181,42 @@ export function Library({
         {groups.map(([name, members]) => (
           <Fragment key={name}>
             {categories.length > 0 && (
-              <Stack
-                direction="row"
-                spacing={0.75}
+              <ButtonBase
+                onClick={() => toggleCategory(name)}
+                aria-expanded={!collapsed.has(name)}
                 sx={{
                   gridColumn: '1 / -1',
                   position: 'sticky',
                   top: 0,
                   zIndex: 1,
-                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: 0.75,
                   py: 0.5,
+                  pr: 0.5,
                   bgcolor: 'background.paper',
                   borderBottom: 1,
                   borderColor: 'divider',
+                  '&:hover': { bgcolor: 'action.hover' },
                 }}
               >
+                <ExpandMoreIcon
+                  sx={{
+                    fontSize: 18,
+                    color: 'action.active',
+                    transform: collapsed.has(name) ? 'rotate(-90deg)' : 'none',
+                    transition: 'transform 0.15s',
+                  }}
+                />
                 {name && <LabelIcon sx={{ fontSize: 16, color: 'action.active' }} />}
-                <Typography variant="caption" sx={{ fontWeight: 600, flex: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, flex: 1, textAlign: 'left' }}>
                   {name || 'No category'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {members.length}
                 </Typography>
-              </Stack>
+              </ButtonBase>
             )}
-            {members.map((sticker) => {
+            {!(categories.length > 0 && collapsed.has(name)) && members.map((sticker) => {
               const placed = onSheet.get(sticker.id) ?? 0;
               const sheets = sheetCount(sticker.id);
               return (
