@@ -1,0 +1,12 @@
+services:
+  key-sticker-sheets:
+    build: .
+    image: key-sticker-sheets
+    ports:
+      - "3000:3000"
+    volumes:
+      - sticker-data:/data
+    restart: unless-stopped
+
+volumes:
+  sticker-data:

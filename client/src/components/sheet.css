@@ -1,0 +1,178 @@
+/*
+ * Physical sticker sheet layout, carried over 1:1 from the PoC (test.html).
+ * All measurements are in real-world units so the printed output keeps its scale.
+ */
+.ks-page {
+  --cell-width: 26mm;
+  --cell-height: 17mm;
+  position: relative;
+  width: fit-content;
+  background: #fff;
+  color: #000;
+}
+
+.ks-marker {
+  position: absolute;
+  height: 1cm;
+  width: 1cm;
+  pointer-events: none;
+}
+
+.ks-marker.top-left {
+  top: 0.5cm;
+  left: 0.5cm;
+  border-left: 1px solid black;
+  border-top: 1px solid black;
+}
+
+.ks-marker.bottom-right {
+  bottom: 0.5cm;
+  right: 0.5cm;
+  border-right: 1px solid black;
+  border-bottom: 1px solid black;
+}
+
+.ks-grid {
+  font-family: 'Segoe UI', 'Selawik', 'Open Sans', Roboto, Arial, sans-serif;
+  display: grid;
+  padding: 1cm;
+  grid-template-columns: repeat(5, var(--cell-width));
+  grid-template-rows: repeat(10, var(--cell-height));
+  row-gap: 2mm;
+  column-gap: 2mm;
+  width: fit-content;
+}
+
+.ks-item {
+  box-sizing: border-box;
+  width: var(--cell-width);
+  height: var(--cell-height);
+  padding: 0;
+  border: 0.2mm solid transparent;
+  position: relative;
+  overflow: hidden;
+  line-height: normal;
+}
+
+.ks-page.outlines .ks-item.filled {
+  border-color: #000;
+}
+
+.ks-line1,
+.ks-line2 {
+  font-size: 8pt;
+  font-weight: bold;
+  position: absolute;
+  left: 2mm;
+  white-space: nowrap;
+}
+
+.ks-line1 {
+  top: 2mm;
+}
+
+.ks-line2 {
+  top: 5.5mm;
+}
+
+.ks-shortcut {
+  font-size: 7pt;
+  position: absolute;
+  bottom: 2mm;
+  left: 2mm;
+  white-space: nowrap;
+}
+
+.ks-icon {
+  position: absolute;
+  right: 2mm;
+  top: 2mm;
+  max-width: 16px;
+  max-height: 16px;
+}
+
+/* ---------- Editor-only affordances (never printed) ---------- */
+
+.ks-interactive .ks-item {
+  cursor: pointer;
+  border: 0.2mm dashed #c5ccd6;
+  border-radius: 0.6mm;
+}
+
+.ks-interactive .ks-item.filled:hover {
+  background: #f3f7fc;
+}
+
+.ks-interactive.outlines .ks-item.filled {
+  border: 0.2mm solid #000;
+}
+
+.ks-interactive .ks-item.selected {
+  outline: 0.6mm solid #1976d2;
+  outline-offset: 0.3mm;
+  background: #eaf2fc;
+}
+
+.ks-interactive .ks-item.skipped {
+  cursor: default;
+  background: repeating-linear-gradient(45deg, #f1f1f1, #f1f1f1 1.5mm, #fafafa 1.5mm, #fafafa 3mm);
+}
+
+.ks-interactive .ks-item.empty {
+  border-color: #e3e7ec;
+}
+
+.ks-interactive .ks-item.empty:hover::after {
+  content: '+';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 18pt;
+  color: #90a4ae;
+}
+
+.ks-interactive .ks-item.drop-target {
+  outline: 0.6mm dashed #ff9800;
+  outline-offset: 0.3mm;
+}
+
+.ks-interactive .ks-item.dragging {
+  opacity: 0.4;
+}
+
+.ks-interactive .ks-item.placeholder-text .ks-line1 {
+  color: #b0bec5;
+  font-weight: normal;
+  font-style: italic;
+}
+
+/* ---------- Printing ---------- */
+
+.ks-print-root {
+  display: none;
+}
+
+@media print {
+  /* The print root is portalled to <body>; hide the whole app */
+  #root {
+    display: none !important;
+  }
+
+  .ks-print-root {
+    display: block;
+  }
+
+  .ks-print-root .ks-page {
+    break-after: page;
+  }
+
+  .ks-print-root .ks-page:last-child {
+    break-after: auto;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+}

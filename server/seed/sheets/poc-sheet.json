@@ -1,0 +1,411 @@
+{
+  "id": "poc-sheet",
+  "name": "IntelliJ & system",
+  "settings": {
+    "skip": 0,
+    "outlines": false
+  },
+  "createdAt": "2026-10-13T16:13:06.207Z",
+  "updatedAt": "2026-10-13T16:13:06.208Z",
+  "stickers": [
+    {
+      "id": "e2f5f9b3-45b3-4479-95b6-93c17243739b",
+      "line1": "DEBUG",
+      "line2": "",
+      "shortcut": "Shift-F9",
+      "icon": "intellij/debug.svg"
+    },
+    {
+      "id": "d5c679fb-09e4-41de-9b6d-5f4d89e5ad0e",
+      "line1": "RUN",
+      "line2": "",
+      "shortcut": "Shift-F10",
+      "icon": "intellij/run.svg"
+    },
+    {
+      "id": "c56c9a05-9190-4850-9c81-8f2c6be13b99",
+      "line1": "DEBUG ...",
+      "line2": "",
+      "shortcut": "Alt-Shift-F9",
+      "icon": "intellij/debug.svg"
+    },
+    {
+      "id": "f339db32-abce-4c15-94bb-1d62ada105ae",
+      "line1": "RUN ...",
+      "line2": "",
+      "shortcut": "Alt-Shift-F10",
+      "icon": "intellij/run.svg"
+    },
+    {
+      "id": "e4afb491-7fc7-43ad-b947-d5472f63524d",
+      "line1": "STOP",
+      "line2": "",
+      "shortcut": "Ctrl-F2",
+      "icon": "intellij/stop.svg"
+    },
+    {
+      "id": "6ac951e0-b3b6-4415-888f-0f0db83ff443",
+      "line1": "PAUSE",
+      "line2": "",
+      "shortcut": "",
+      "icon": "intellij/pause.svg"
+    },
+    {
+      "id": "f0a9563c-7f54-4d3e-844a-0585f268d10a",
+      "line1": "RESUME",
+      "line2": "",
+      "shortcut": "F9",
+      "icon": "intellij/resume.svg"
+    },
+    {
+      "id": "f6428cfa-338f-4492-944c-248d670f39e3",
+      "line1": "GENERATE",
+      "line2": "SOURCES",
+      "shortcut": "",
+      "icon": "intellij/updateFolders.svg"
+    },
+    {
+      "id": "1f937d03-aa63-4449-924e-5512ea641fa8",
+      "line1": "RELOAD",
+      "line2": "MAVEN",
+      "shortcut": "",
+      "icon": "intellij/mavenLoadChanges.svg"
+    },
+    {
+      "id": "d6bc376c-a1b7-4fff-a049-4522691401fb",
+      "line1": "BUILD",
+      "line2": "PROJECT",
+      "shortcut": "",
+      "icon": "intellij/build.svg"
+    },
+    {
+      "id": "99caca48-8fc8-4ffa-8421-e2b650f8f116",
+      "line1": "REBUILD",
+      "line2": "PROJECT",
+      "shortcut": "",
+      "icon": "intellij/rebuild.svg"
+    },
+    {
+      "id": "c470c678-fb1f-435e-aad4-843fc467513d",
+      "line1": "STEP",
+      "line2": "OVER",
+      "shortcut": "F8",
+      "icon": "intellij/stepOver.svg"
+    },
+    {
+      "id": "a6c689f8-6080-4137-8016-d9b16b929510",
+      "line1": "STEP",
+      "line2": "INTO",
+      "shortcut": "F7",
+      "icon": "intellij/stepInto.svg"
+    },
+    {
+      "id": "dcc75293-a099-477f-84bb-498d30e2f3e5",
+      "line1": "INTRODUCE",
+      "line2": "PARAMETER",
+      "shortcut": "Ctrl-Alt-P",
+      "icon": "intellij/parameter.svg"
+    },
+    {
+      "id": "5d986390-7f0d-43f1-9343-8da76a35b562",
+      "line1": "INTRODUCE",
+      "line2": "VARIABLE",
+      "shortcut": "Ctrl-Alt-V",
+      "icon": "intellij/variable.svg"
+    },
+    {
+      "id": "cb957cfe-9106-48dc-8ba4-e55d24e9aa73",
+      "line1": "INTRODUCE",
+      "line2": "CONSTANT",
+      "shortcut": "Ctrl-Alt-C",
+      "icon": "intellij/constant.svg"
+    },
+    {
+      "id": "8dbe4de0-efa1-46a4-b95a-8dd6104b7768",
+      "line1": "INTRODUCE",
+      "line2": "PROPERTY",
+      "shortcut": "Ctrl-Alt-F",
+      "icon": "intellij/property.svg"
+    },
+    {
+      "id": "a4296d2a-0638-47ae-b4f0-7fcc6bbad786",
+      "line1": "INLINE",
+      "line2": "",
+      "shortcut": "Ctrl-Alt-N",
+      "icon": ""
+    },
+    {
+      "id": "bbee2eb3-f244-4379-aac3-13f93a0b7fed",
+      "line1": "EXTRACT",
+      "line2": "FUNCTION",
+      "shortcut": "Ctrl-Alt-M",
+      "icon": "intellij/function.svg"
+    },
+    {
+      "id": "194d9d95-4173-47f4-83ba-0424926281e9",
+      "line1": "RENAME",
+      "line2": "",
+      "shortcut": "Shift-F6",
+      "icon": "intellij/edit.svg"
+    },
+    {
+      "id": "3f5988da-2122-402e-ba55-6dd46a5285cf",
+      "line1": "CHANGE",
+      "line2": "SIGNATURE",
+      "shortcut": "Ctrl-F6",
+      "icon": ""
+    },
+    {
+      "id": "10cf5a85-f51a-4c91-b617-5a97cbc6d36a",
+      "line1": "MOVE",
+      "line2": "",
+      "shortcut": "F6",
+      "icon": "intellij/moveToButton.svg"
+    },
+    {
+      "id": "919c7de9-8936-4a29-af91-313b86dcbf43",
+      "line1": "COPY",
+      "line2": "",
+      "shortcut": "F5",
+      "icon": "intellij/copy.svg"
+    },
+    {
+      "id": "dea40311-af6c-423d-8a55-4df07e8049a1",
+      "line1": "FIND",
+      "line2": "USAGES",
+      "shortcut": "Alt-F7",
+      "icon": "intellij/find.svg"
+    },
+    {
+      "id": "a5a81da8-2310-47de-896c-447a9680d6df",
+      "line1": "BOOKMARK",
+      "line2": "",
+      "shortcut": "F11",
+      "icon": "intellij/bookmark.svg"
+    },
+    {
+      "id": "0be3a7c4-2269-478f-8907-3e8c8fa6fb57",
+      "line1": "LIST",
+      "line2": "BOOKMARKS",
+      "shortcut": "Shift+F11",
+      "icon": "intellij/bookmarksList.svg"
+    },
+    {
+      "id": "8395d98c-5542-4aa0-a0cd-17693b24c410",
+      "line1": "REFORMAT",
+      "line2": "CODE",
+      "shortcut": "Ctrl-Alt-L",
+      "icon": "intellij/reformatCode.svg"
+    },
+    {
+      "id": "46a27e84-eb3f-4b79-832a-7e2552aac6b0",
+      "line1": "OPTIMIZE",
+      "line2": "IMPORTS",
+      "shortcut": "Ctrl-Alt-O",
+      "icon": ""
+    },
+    {
+      "id": "577dd5bb-9f4a-44b8-a5af-6f4c9206adb6",
+      "line1": "COMMENT",
+      "line2": "LINES",
+      "shortcut": "Ctrl-/",
+      "icon": "intellij/inlayRenameInComments.svg"
+    },
+    {
+      "id": "bcb6162d-e101-4c21-afbc-391189418586",
+      "line1": "GENERATE ...",
+      "line2": "",
+      "shortcut": "Alt-Insert",
+      "icon": ""
+    },
+    {
+      "id": "7870061a-29ed-4317-8141-6708dac650c1",
+      "line1": "COL. SEL.",
+      "line2": "MODE",
+      "shortcut": "Alt-Shift-Insert",
+      "icon": ""
+    },
+    {
+      "id": "ef6cd2fe-e4ac-4afb-8fa4-1ffb292267dc",
+      "line1": "SCRATCH",
+      "line2": "FILE",
+      "shortcut": "Alt-Shift-Insert",
+      "icon": "intellij/scratches.svg"
+    },
+    {
+      "id": "93e8249c-5369-427d-ace5-505e6d299f41",
+      "line1": "SHOW",
+      "line2": "DIAGRAM",
+      "shortcut": "Ctrl-Alt-Shift-U",
+      "icon": "intellij/diagram.svg"
+    },
+    {
+      "id": "31161570-6b7f-4eef-a701-90c40edaad9a",
+      "line1": "LOCAL",
+      "line2": "HISTORY",
+      "shortcut": "",
+      "icon": "intellij/history.svg"
+    },
+    {
+      "id": "b6d39886-21f2-4303-9a77-eb5652cb9d6a",
+      "line1": "REFACTOR ...",
+      "line2": "",
+      "shortcut": "Ctrl-Alt-Shift-T",
+      "icon": "intellij/suggestedRefactoring.svg"
+    },
+    {
+      "id": "160ba59e-46fb-41e9-b9f7-05a080491ddf",
+      "line1": "GIT",
+      "line2": "COMMIT",
+      "shortcut": "Ctrl-K",
+      "icon": "intellij/commit.svg"
+    },
+    {
+      "id": "68477352-f708-477e-b150-d16591cd2eee",
+      "line1": "GIT",
+      "line2": "PUSH",
+      "shortcut": "Ctrl-Shift-K",
+      "icon": "intellij/push.svg"
+    },
+    {
+      "id": "40ce5c0a-6cc1-4231-a38d-6a3331e3122d",
+      "line1": "GIT",
+      "line2": "PULL",
+      "shortcut": "Shift-T",
+      "icon": "intellij/update.svg"
+    },
+    {
+      "id": "414bf2e9-738c-4330-94f8-c55260cd887d",
+      "line1": "GIT",
+      "line2": "MERGE",
+      "shortcut": "",
+      "icon": "intellij/merge.svg"
+    },
+    {
+      "id": "7b53c98d-855f-4e3f-a2f9-dca29300ef68",
+      "line1": "GIT",
+      "line2": "LOG",
+      "shortcut": "",
+      "icon": "intellij/changelist.svg"
+    },
+    {
+      "id": "0738571e-9c02-4d2d-a38c-e05c29fdead9",
+      "line1": "GIT",
+      "line2": "FILE HISTORY",
+      "shortcut": "",
+      "icon": "intellij/history.svg"
+    },
+    {
+      "id": "9b4284b0-f434-4ac5-91aa-0d086c080951",
+      "line1": "GIT",
+      "line2": "BLAME",
+      "shortcut": "",
+      "icon": ""
+    },
+    {
+      "id": "918d7c63-6f37-4873-be14-abbf58909a0a",
+      "line1": "GIT",
+      "line2": "DIFF",
+      "shortcut": "Ctrl-D",
+      "icon": "intellij/diff.svg"
+    },
+    {
+      "id": "2e4743b9-59a5-41d8-b011-3f729e1de28a",
+      "line1": "GIT",
+      "line2": "BRANCHES",
+      "shortcut": "",
+      "icon": "intellij/vcs.svg"
+    },
+    {
+      "id": "d3d209b0-6ab2-46fc-91c5-9af8e9752496",
+      "line1": "GIT",
+      "line2": "NEW BRANCH",
+      "shortcut": "",
+      "icon": ""
+    },
+    {
+      "id": "eab45523-f0db-460b-94ab-7b9aa436b98c",
+      "line1": "GIT",
+      "line2": "STASH",
+      "shortcut": "",
+      "icon": "intellij/shelve.svg"
+    },
+    {
+      "id": "ed94c437-2d31-4cb5-a2c4-1ec76dc28f41",
+      "line1": "GIT",
+      "line2": "UNSTASH",
+      "shortcut": "",
+      "icon": "intellij/unshelve.svg"
+    },
+    {
+      "id": "d3952f02-eec3-4ae6-b340-d3e1604aab28",
+      "line1": "TERMINAL",
+      "line2": "",
+      "shortcut": "Alt-F12",
+      "icon": "intellij/terminal.svg"
+    },
+    {
+      "id": "e5bf667e-c1d2-407e-b478-36cf10358020",
+      "line1": "PLAY",
+      "line2": "",
+      "shortcut": "",
+      "icon": "material/play_circle_outline_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "523cad62-5852-46a2-aba7-0797e3b22c7b",
+      "line1": "SKIP",
+      "line2": "NEXT",
+      "shortcut": "",
+      "icon": "material/skip_next_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "f24d7274-39c6-4b8b-9a61-cee7666d2ae5",
+      "line1": "SKIP",
+      "line2": "PREVIOUS",
+      "shortcut": "",
+      "icon": "material/skip_previous_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "123ed041-ac75-40c1-a0ed-8be4405616d7",
+      "line1": "LOCK",
+      "line2": "SCREEN",
+      "shortcut": "Win-L",
+      "icon": "material/lock_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "6278d1d7-563a-4974-80b0-9f37af88ae3b",
+      "line1": "SWITCH",
+      "line2": "KB LAYOUT",
+      "shortcut": "Win-Space",
+      "icon": "material/language_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "b2c66e96-16a8-4442-b258-0e7a72ac8858",
+      "line1": "SNIPPING",
+      "line2": "TOOL",
+      "shortcut": "Shift-Win+S",
+      "icon": "material/screenshot_monitor_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "bac21847-9a7c-469f-a504-3212ee07145b",
+      "line1": "SLEEP",
+      "line2": "",
+      "shortcut": "",
+      "icon": "material/bedtime_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "aa878ea1-0076-4bd7-a39b-09d50f17b013",
+      "line1": "NOTIFICA-",
+      "line2": "TIONS",
+      "shortcut": "Win-N",
+      "icon": "material/notifications_24dp_1F1F1F.svg"
+    },
+    {
+      "id": "dc4fb82f-f82e-4cd9-a518-da116f1bcf06",
+      "line1": "LAUNCH",
+      "line2": "CALCULATOR",
+      "shortcut": "",
+      "icon": "material/calculate_24dp_1F1F1F.svg"
+    }
+  ]
+}
