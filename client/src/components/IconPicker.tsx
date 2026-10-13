@@ -34,6 +34,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMoveOutlined';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { api, iconUrl } from '../api';
+import { ICON_EXTENSIONS, extractIcons, isZip } from '../iconArchive';
 import type { IconInfo } from '../types';
 
 interface Props {
@@ -53,6 +54,8 @@ interface Props {
   usage: (path: string) => number;
   onIconsChanged: () => void;
   onError: (message: string) => void;
+  /** Reports a completed action, such as unpacking an archive */
+  onNotice: (message: string) => void;
 }
 
 const baseName = (file: string) => file.replace(/\.[a-z]+$/i, '');
@@ -77,7 +80,7 @@ function readCollapsed(): Set<string> {
   }
 }
 
-export function IconPicker({ open, icons, folders: folderList, value = '', onClose, onSelect, onCreateSticker, onRename, usage, onIconsChanged, onError }: Props) {
+export function IconPicker({ open, icons, folders: folderList, value = '', onClose, onSelect, onCreateSticker, onRename, usage, onIconsChanged, onError, onNotice }: Props) {
   const [search, setSearch] = useState('');
   const [folder, setFolder] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -151,21 +154,44 @@ export function IconPicker({ open, icons, folders: folderList, value = '', onClo
     fileInput.current?.click();
   };
 
+  /** Uploads icon files to the target folder. Zip archives are unpacked into it. */
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
     const target = uploadTarget.current;
     // Show the new icons, even in a collapsed folder
     if (collapsed.has(target)) toggleFolder(target);
     let last: IconInfo | null = null;
+    let uploaded = 0;
     for (const file of Array.from(files)) {
+      if (!isZip(file)) {
+        try {
+          last = await api.uploadIcon(target, file);
+          uploaded++;
+        } catch (e) {
+          onError(`Upload of ${file.name} failed: ${(e as Error).message}`);
+        }
+        continue;
+      }
       try {
-        last = await api.uploadIcon(target, file);
+        const archive = await extractIcons(file);
+        let extracted = 0;
+        for (const icon of archive.files) {
+          try {
+            await api.uploadIcon(target, icon);
+            extracted++;
+          } catch (e) {
+            onError(`Upload of ${icon.name} from ${file.name} failed: ${(e as Error).message}`);
+          }
+        }
+        const skipped = archive.skipped ? `, skipped ${archive.skipped} other file${archive.skipped === 1 ? '' : 's'}` : '';
+        onNotice(`Added ${extracted} icon${extracted === 1 ? '' : 's'} from ${file.name} to ${target}${skipped}`);
       } catch (e) {
-        onError(`Upload of ${file.name} failed: ${(e as Error).message}`);
+        onError(`Could not read ${file.name}: ${(e as Error).message}`);
       }
     }
     onIconsChanged();
-    if (last && files.length === 1) onSelect?.(last.path);
+    // Choosing a single uploaded icon is the obvious intent; a batch is not
+    if (last && uploaded === 1 && files.length === 1) onSelect?.(last.path);
   };
 
   const remove = async (icon: IconInfo) => {
@@ -397,7 +423,7 @@ export function IconPicker({ open, icons, folders: folderList, value = '', onClo
                     >
                       <UploadIcon />
                       <Typography variant="body2">Upload icons</Typography>
-                      <Typography variant="caption">Empty folder. Click to choose files, or drop them here.</Typography>
+                      <Typography variant="caption">Empty folder. Click to choose files, or drop icons or a zip archive here.</Typography>
                     </ButtonBase>
                   )}
                 </Box>
@@ -417,7 +443,7 @@ export function IconPicker({ open, icons, folders: folderList, value = '', onClo
           type="file"
           hidden
           multiple
-          accept=".svg,.png,.jpg,.jpeg,.webp,.gif"
+          accept={[...ICON_EXTENSIONS, '.zip'].join(',')}
           onChange={(e) => {
             upload(e.target.files);
             e.target.value = '';

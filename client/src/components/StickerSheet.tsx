@@ -12,7 +12,7 @@ export const LIBRARY_DRAG_TYPE = 'application/x-library-sticker';
 
 const MISSING: Sticker = { id: '', line1: '?', line2: 'MISSING', shortcut: '', icon: '', category: '' };
 
-type Slot =
+export type Slot =
   | { kind: 'skipped' }
   | { kind: 'sticker'; item: SheetItem; sticker: Sticker; index: number }
   | { kind: 'empty' };
@@ -246,15 +246,32 @@ export function StickerSheetPrint({ sheet, stickers }: { sheet: Sheet; stickers:
       {/* Margins are drawn by the paper element itself so print matches the preview exactly */}
       <style>{`@page { size: ${paper.width}mm ${paper.height}mm; margin: 0; }`}</style>
       {pages.map((slots, pageIndex) => (
-        <Paper key={pageIndex} sheet={sheet} page={pageIndex + 1} pageCount={pages.length}>
-          {slots.map((slot, i) => (
-            <div key={i} className={`ks-item${slot.kind === 'sticker' ? ' filled' : ''}`}>
-              {slot.kind === 'sticker' && <StickerFace sticker={slot.sticker} />}
-            </div>
-          ))}
-        </Paper>
+        <PrintedPage key={pageIndex} sheet={sheet} slots={slots} page={pageIndex + 1} pageCount={pages.length} />
       ))}
     </div>,
     document.body,
+  );
+}
+
+/** One printed page, as it comes out of the printer */
+export function PrintedPage({
+  sheet,
+  slots,
+  page,
+  pageCount,
+}: {
+  sheet: Sheet;
+  slots: Slot[];
+  page: number;
+  pageCount: number;
+}) {
+  return (
+    <Paper sheet={sheet} page={page} pageCount={pageCount}>
+      {slots.map((slot, i) => (
+        <div key={i} className={`ks-item${slot.kind === 'sticker' ? ' filled' : ''}`}>
+          {slot.kind === 'sticker' && <StickerFace sticker={slot.sticker} />}
+        </div>
+      ))}
+    </Paper>
   );
 }

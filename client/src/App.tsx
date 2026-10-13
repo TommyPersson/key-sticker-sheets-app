@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import PrintIcon from '@mui/icons-material/Print';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
@@ -396,6 +397,26 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   };
 
+  const [cutExporting, setCutExporting] = useState(false);
+  /** Downloads the open sheet as an xTool Studio print-then-cut project */
+  const exportCutProject = async () => {
+    if (!sheet) return;
+    setCutExporting(true);
+    try {
+      const { exportXTool } = await import('./xtool');
+      const blob = await exportXTool(sheet, stickers);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${sheet.name.replace(/[^\w.-]+/g, '_')}.xs`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      showError(`Could not export the xTool project: ${(e as Error).message}`);
+    } finally {
+      setCutExporting(false);
+    }
+  };
+
   /** Imports a sheet file, reusing identical library stickers and adding the rest */
   const importSheet = async (file: File) => {
     try {
@@ -510,6 +531,19 @@ export default function App() {
                   <ZoomInIcon />
                 </IconButton>
               </Stack>
+              <Tooltip title="Download an xTool Studio project that knife-cuts the printed stickers">
+                <span>
+                  <Button
+                    color="inherit"
+                    variant="outlined"
+                    startIcon={<ContentCutIcon />}
+                    onClick={exportCutProject}
+                    disabled={!items.length || cutExporting}
+                  >
+                    xTool
+                  </Button>
+                </span>
+              </Tooltip>
               <Button
                 variant="contained"
                 startIcon={<PrintIcon />}
@@ -743,6 +777,7 @@ export default function App() {
           usage={iconUsage}
           onIconsChanged={refreshIcons}
           onError={showError}
+          onNotice={(text) => setMessage({ text, severity: 'success' })}
         />
       )}
       <IconPicker
@@ -755,6 +790,7 @@ export default function App() {
         usage={iconUsage}
         onIconsChanged={refreshIcons}
         onError={showError}
+        onNotice={(text) => setMessage({ text, severity: 'success' })}
       />
 
       <Snackbar
