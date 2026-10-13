@@ -6,6 +6,8 @@ export interface Sticker {
   shortcut: string;
   /** Icon path relative to the icon store, e.g. "intellij/debug.svg". Empty for no icon. */
   icon: string;
+  /** Free-text grouping used to filter the library, e.g. "Debugging". Empty for none. */
+  category: string;
   createdAt?: string;
   updatedAt?: string;
 }

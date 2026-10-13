@@ -281,6 +281,7 @@ function normalizeSticker(input) {
     line2: str(input?.line2),
     shortcut: str(input?.shortcut),
     icon: str(input?.icon, 300),
+    category: str(input?.category, 60).trim(),
     createdAt: str(input?.createdAt, 40) || undefined,
     updatedAt: str(input?.updatedAt, 40) || undefined,
   };

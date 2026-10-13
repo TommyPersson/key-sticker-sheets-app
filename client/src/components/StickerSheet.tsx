@@ -10,7 +10,7 @@ export const perPage = (settings: SheetSettings) => gridFor(settings).perPage;
 /** Drag data type used when dragging a sticker out of the library */
 export const LIBRARY_DRAG_TYPE = 'application/x-library-sticker';
 
-const MISSING: Sticker = { id: '', line1: '?', line2: 'MISSING', shortcut: '', icon: '' };
+const MISSING: Sticker = { id: '', line1: '?', line2: 'MISSING', shortcut: '', icon: '', category: '' };
 
 type Slot =
   | { kind: 'skipped' }

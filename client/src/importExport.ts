@@ -1,6 +1,6 @@
 import type { Sheet, SheetSettings, Sticker } from './types';
 
-export type StickerContent = Pick<Sticker, 'line1' | 'line2' | 'shortcut' | 'icon'>;
+export type StickerContent = Pick<Sticker, 'line1' | 'line2' | 'shortcut' | 'icon' | 'category'>;
 
 /** Self-contained sheet file: stickers are embedded, so it can be imported into another library. */
 export interface SheetFile {
@@ -14,6 +14,7 @@ const text = (v: unknown) => (typeof v === 'string' ? v : '');
 /** Accepts the PoC "icons/folder/file.svg" form as well as plain "folder/file.svg". */
 const iconPath = (v: unknown) => text(v).replace(/^\/?icons\//, '');
 
+/** Only the printed content identifies a sticker; the category is just a label */
 export const contentKey = (s: StickerContent) => JSON.stringify([s.line1, s.line2, s.shortcut, s.icon]);
 
 export function toSheetFile(sheet: Sheet, stickers: Record<string, Sticker>): SheetFile {
@@ -23,7 +24,7 @@ export function toSheetFile(sheet: Sheet, stickers: Record<string, Sticker>): Sh
     stickers: sheet.items
       .map((i) => stickers[i.stickerId])
       .filter(Boolean)
-      .map(({ line1, line2, shortcut, icon }) => ({ line1, line2, shortcut, icon })),
+      .map(({ line1, line2, shortcut, icon, category }) => ({ line1, line2, shortcut, icon, category })),
   };
 }
 
@@ -43,7 +44,13 @@ export function parseImport(json: string, fallbackName: string): SheetFile {
     settings: { ...data?.settings } as SheetSettings,
     stickers: rawStickers.map((raw) => {
       const s = (raw ?? {}) as Record<string, unknown>;
-      return { line1: text(s.line1), line2: text(s.line2), shortcut: text(s.shortcut), icon: iconPath(s.icon) };
+      return {
+        line1: text(s.line1),
+        line2: text(s.line2),
+        shortcut: text(s.shortcut),
+        icon: iconPath(s.icon),
+        category: text(s.category).trim(),
+      };
     }),
   };
 }

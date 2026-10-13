@@ -31,7 +31,7 @@ import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import { api } from './api';
 import { SheetList } from './components/SheetList';
-import { Library } from './components/Library';
+import { Library, categoriesOf } from './components/Library';
 import { FloatingColumn, FloatingPane, paneClearance } from './components/FloatingPane';
 import { StickerEditor } from './components/StickerEditor';
 import { SheetPlacement, type PlacementActions } from './components/SheetPlacement';
@@ -55,7 +55,7 @@ const MINIMIZED_PANE_HEIGHT = 36;
 /** A sticker placed on the open sheet, or a sticker picked in the library */
 type Selection = { kind: 'item'; id: string } | { kind: 'sticker'; id: string } | null;
 
-const blankSticker = (): Sticker => ({ id: crypto.randomUUID(), line1: '', line2: '', shortcut: '', icon: '' });
+const blankSticker = (): Sticker => ({ id: crypto.randomUUID(), line1: '', line2: '', shortcut: '', icon: '', category: '' });
 const newItem = (stickerId: string): SheetItem => ({ id: crypto.randomUUID(), stickerId });
 
 /** Library list from the server as an id → sticker map (dropping the usage info) */
@@ -479,15 +479,6 @@ export default function App() {
                   <ZoomInIcon />
                 </IconButton>
               </Stack>
-              <Tooltip title="Create a new sticker in the library and place it on this sheet">
-                <Button
-                  color="inherit"
-                  startIcon={<AddIcon />}
-                  onClick={() => createSticker(selectedIndex >= 0 ? selectedIndex + 1 : items.length)}
-                >
-                  New sticker
-                </Button>
-              </Tooltip>
               <Button
                 variant="contained"
                 startIcon={<PrintIcon />}
@@ -652,6 +643,9 @@ export default function App() {
                       sticker={selectedSticker}
                       dimensions={dimensions}
                       usedOn={usedOnIds(selectedSticker.id).map(sheetName)}
+                      categories={categoriesOf(
+                        Object.fromEntries(Object.entries(stickers).filter(([id]) => id !== selectedSticker.id)),
+                      )}
                       onChange={(patch) =>
                         updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)
                       }
