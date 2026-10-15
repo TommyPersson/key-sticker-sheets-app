@@ -1,9 +1,28 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Box, Button, ButtonBase, Chip, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  ButtonBase,
+  Chip,
+  IconButton,
+  InputAdornment,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import LabelIcon from '@mui/icons-material/LabelOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import DeleteIcon from '@mui/icons-material/Delete';
+import LabelOffIcon from '@mui/icons-material/LabelOffOutlined';
 import { StickerFace, LIBRARY_DRAG_TYPE, sheetCssVars } from './StickerSheet';
 import type { SheetDimensions, Sticker } from '../types';
 
@@ -22,6 +41,10 @@ interface Props {
   onSelect: (stickerId: string) => void;
   onCreate: () => void;
   onAddToSheet: (stickerId: string) => void;
+  /** Moves a sticker to another category ('' for none) */
+  onMove: (stickerId: string, category: string) => void;
+  /** Deletes a sticker from the library; the caller confirms */
+  onDelete: (stickerId: string) => void;
 }
 
 const PX_PER_MM = 96 / 25.4;
@@ -60,11 +83,21 @@ export function Library({
   onSelect,
   onCreate,
   onAddToSheet,
+  onMove,
+  onDelete,
 }: Props) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [chosenCategory, setChosenCategory] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  // A card's actions menu, and its "Move to" submenu while open. One menu for all cards, rendered outside
+  // them, so its clicks don't reach the card (which selects and drags)
+  const [menu, setMenu] = useState<{ anchor: HTMLElement; sticker: Sticker } | null>(null);
+  const [moveAnchor, setMoveAnchor] = useState<HTMLElement | null>(null);
+  const closeMenus = () => {
+    setMoveAnchor(null);
+    setMenu(null);
+  };
   const toggleCategory = (name: string) => {
     const next = new Set(collapsed);
     if (!next.delete(name)) next.add(name);
@@ -108,6 +141,10 @@ export function Library({
   }, [list, categories]);
 
   // The sticker fills the card's width, and the card has the sticker's proportions
+  // The categories the menu's sticker can move to, and "no category" if it has one
+  const current = menu?.sticker.category.trim() ?? '';
+  const moveTargets = [...categories.filter((c) => c !== current), ...(current ? [''] : [])];
+
   const zoom = (CARD_WIDTH - CARD_FRAME) / (dimensions.cellWidth * PX_PER_MM);
   const cardHeight = dimensions.cellHeight * PX_PER_MM * zoom + CARD_FRAME;
   const filters: [Filter, string][] = [
@@ -249,6 +286,8 @@ export function Library({
                     cursor: hasSheet ? 'grab' : 'pointer',
                     opacity: sheets === 0 ? 0.75 : 1,
                     '&:hover': { borderColor: 'primary.light' },
+                    '& .card-action': { opacity: 0 },
+                    '&:hover .card-action, &:focus-within .card-action': { opacity: 1 },
                   }}
                 >
                   <Box sx={{ zoom, bgcolor: '#fff', color: '#000', pointerEvents: 'none' }}>
@@ -258,6 +297,29 @@ export function Library({
                       </div>
                     </div>
                   </Box>
+                  <IconButton
+                    className={menu?.sticker.id === sticker.id ? undefined : 'card-action'}
+                    size="small"
+                    draggable={false}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenu({ anchor: e.currentTarget, sticker });
+                    }}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    aria-label={`More actions for ${[sticker.line1, sticker.line2].filter(Boolean).join(' ') || 'sticker'}`}
+                    aria-haspopup="menu"
+                    sx={{
+                      position: 'absolute',
+                      top: 2,
+                      right: 2,
+                      p: 0.25,
+                      bgcolor: 'background.paper',
+                      transition: 'opacity 0.15s',
+                      '&:hover': { bgcolor: 'background.paper' },
+                    }}
+                  >
+                    <MoreVertIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
                   {placed > 0 && (
                     <Chip
                       size="small"
@@ -277,6 +339,63 @@ export function Library({
           </Typography>
         )}
       </Box>
+
+      <Menu anchorEl={menu?.anchor} open={!!menu} onClose={() => setMenu(null)}>
+        <MenuItem
+          onClick={(e) => setMoveAnchor(e.currentTarget)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight') setMoveAnchor(e.currentTarget);
+          }}
+          disabled={moveTargets.length === 0}
+          aria-haspopup="menu"
+          aria-expanded={!!moveAnchor}
+        >
+          <ListItemIcon>
+            <DriveFileMoveIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Move to</ListItemText>
+          <ChevronRightIcon fontSize="small" sx={{ ml: 2, color: 'action.active' }} />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const id = menu!.sticker.id;
+            setMenu(null);
+            onDelete(id);
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
+      <Menu
+        anchorEl={moveAnchor}
+        open={!!moveAnchor}
+        onClose={() => setMoveAnchor(null)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') setMoveAnchor(null);
+        }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+      >
+        {moveTargets.map((target) => (
+          <MenuItem
+            key={target}
+            onClick={() => {
+              const id = menu!.sticker.id;
+              closeMenus();
+              onMove(id, target);
+            }}
+          >
+            <ListItemIcon>
+              {target ? <LabelIcon fontSize="small" /> : <LabelOffIcon fontSize="small" />}
+            </ListItemIcon>
+            <ListItemText>{target || 'No category'}</ListItemText>
+          </MenuItem>
+        ))}
+      </Menu>
     </Box>
   );
 }

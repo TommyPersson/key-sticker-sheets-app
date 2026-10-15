@@ -13,9 +13,9 @@ interface Args {
   width: number;
 }
 
-/** The library pane with local selection; the first three stickers count as placed on the open sheet */
+/** The library pane with local state; the first three stickers count as placed on the open sheet */
 function LibraryPane({ size, hasSheet, width }: Args) {
-  const stickers = sampleStickers(size);
+  const [stickers, setStickers] = useState(() => sampleStickers(size));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const onSheet = new Map(hasSheet ? stickers.slice(0, 3).map((s, i) => [s.id, i + 1]) : []);
   return (
@@ -31,6 +31,8 @@ function LibraryPane({ size, hasSheet, width }: Args) {
         onSelect={setSelectedId}
         onCreate={() => {}}
         onAddToSheet={() => {}}
+        onMove={(id, category) => setStickers((list) => list.map((s) => (s.id === id ? { ...s, category } : s)))}
+        onDelete={(id) => setStickers((list) => list.filter((s) => s.id !== id))}
       />
     </Paper>
   );
@@ -39,6 +41,8 @@ function LibraryPane({ size, hasSheet, width }: Args) {
 const meta = {
   title: 'Panels/Library',
   component: LibraryPane,
+  // Remounts on size changes, so the stickers are those of the size
+  render: (args) => <LibraryPane key={args.size} {...args} />,
   args: { size: '1.5u', hasSheet: true, width: 400 },
   argTypes: {
     size: { control: 'inline-radio', options: ['1.5u', '1u'] },

@@ -348,7 +348,10 @@ export default function App() {
   const deleteFromLibrary = async (stickerId: string) => {
     const usedOn = usedOnIds(stickerId).map(sheetName);
     const where = usedOn.length ? `\n\nIt will also be removed from: ${usedOn.join(', ')}.` : '';
-    if (!confirm(`Delete this sticker from the library?${where}\n\nThis cannot be undone.`)) return;
+    // An empty sticker has nothing worth keeping, so it goes without asking
+    const s = stickers[stickerId];
+    const empty = s && !s.line1 && !s.line2 && !s.shortcut && !s.icon;
+    if (!empty && !confirm(`Delete this sticker from the library?${where}\n\nThis cannot be undone.`)) return;
     try {
       await ws.flush();
       await api.deleteSticker(stickerId);
@@ -784,6 +787,8 @@ export default function App() {
                 onSelect={(id) => setSelection({ kind: 'sticker', id })}
                 onCreate={() => createSticker()}
                 onAddToSheet={(id) => place(id, items.length)}
+                onMove={(id, category) => updateSticker(id, { category })}
+                onDelete={deleteFromLibrary}
               />
             </FloatingPane>
             {selectedSticker && (

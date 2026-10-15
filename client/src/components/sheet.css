@@ -202,7 +202,12 @@
   border-color: #e3e7ec;
 }
 
-.ks-interactive .ks-item.empty:hover::after {
+/* Only the slot after the last sticker creates a new one */
+.ks-interactive .ks-item.empty:not(.next) {
+  cursor: default;
+}
+
+.ks-interactive .ks-item.empty.next:hover::after {
   content: '+';
   position: absolute;
   inset: 0;

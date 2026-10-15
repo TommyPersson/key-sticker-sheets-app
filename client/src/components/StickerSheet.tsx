@@ -307,7 +307,10 @@ export function StickerSheetEditor({
             const moveTarget = slot.kind === 'sticker' ? slot.index : count - 1;
             const insertTarget = slot.kind === 'sticker' ? slot.index : count;
 
+            // New stickers are appended, so only the slot they'd land in creates one
+            const next = slot.kind === 'empty' && slotNumber === sheet.settings.skip + count;
             const classes = ['ks-item', slot.kind === 'sticker' ? 'filled' : 'empty'];
+            if (next) classes.push('next');
             if (slot.kind === 'sticker') {
               if (slot.item.id === selectedId) classes.push('selected');
               if (slot.item.stickerId === highlightStickerId) classes.push('highlighted');
@@ -325,8 +328,11 @@ export function StickerSheetEditor({
                 key={key}
                 className={classes.join(' ')}
                 draggable={slot.kind === 'sticker'}
-                onClick={() => (slot.kind === 'sticker' ? onSelect(slot.item.id) : onAppend())}
-                title={slot.kind === 'empty' ? 'Add a new sticker, or drop one from the library' : undefined}
+                onClick={() => {
+                  if (slot.kind === 'sticker') onSelect(slot.item.id);
+                  else if (next) onAppend();
+                }}
+                title={next ? 'Add a new sticker, or drop one from the library' : undefined}
                 onDragStart={(e) => {
                   if (slot.kind !== 'sticker') return;
                   e.dataTransfer.effectAllowed = 'move';
