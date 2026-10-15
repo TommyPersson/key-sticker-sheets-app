@@ -24,6 +24,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LabelOffIcon from '@mui/icons-material/LabelOffOutlined';
 import { StickerFace, LIBRARY_DRAG_TYPE, sheetCssVars } from './StickerSheet';
 import type { SheetDimensions, Sticker } from '../types';
@@ -45,6 +46,8 @@ interface Props {
   onAddToSheet: (stickerId: string) => void;
   /** Moves a sticker to another category ('' for none) */
   onMove: (stickerId: string, category: string) => void;
+  /** Adds a copy of a sticker to the library */
+  onDuplicate: (stickerId: string) => void;
   /** Deletes a sticker from the library; the caller confirms */
   onDelete: (stickerId: string) => void;
 }
@@ -88,6 +91,7 @@ export function Library({
   onCreate,
   onAddToSheet,
   onMove,
+  onDuplicate,
   onDelete,
 }: Props) {
   const [search, setSearch] = useState('');
@@ -364,6 +368,18 @@ export function Library({
           </ListItemIcon>
           <ListItemText>Move to</ListItemText>
           <ChevronRightIcon fontSize="small" sx={{ ml: 2, color: 'action.active' }} />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const id = menu!.sticker.id;
+            setMenu(null);
+            onDuplicate(id);
+          }}
+        >
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Duplicate</ListItemText>
         </MenuItem>
         <MenuItem
           onClick={() => {

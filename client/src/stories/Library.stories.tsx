@@ -32,6 +32,11 @@ function LibraryPane({ size, hasSheet, width }: Args) {
         onCreate={() => {}}
         onAddToSheet={() => {}}
         onMove={(id, category) => setStickers((list) => list.map((s) => (s.id === id ? { ...s, category } : s)))}
+        onDuplicate={(id) => {
+          const copy = { ...stickers.find((s) => s.id === id)!, id: crypto.randomUUID() };
+          setStickers((list) => [...list, copy]);
+          setSelectedId(copy.id);
+        }}
         onDelete={(id) => setStickers((list) => list.filter((s) => s.id !== id))}
       />
     </Paper>

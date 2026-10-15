@@ -358,6 +358,12 @@ export default function App() {
     setMessage({ text: 'This spot now uses its own copy of the sticker', severity: 'success' });
   };
 
+  /** Adds a copy of a library sticker, outside any sheet, and opens it in the editor */
+  const duplicateSticker = (stickerId: string) => {
+    const { line1, line2, shortcut, icon, category, layout } = stickers[stickerId];
+    createSticker(undefined, { line1, line2, shortcut, icon, category, layout });
+  };
+
   const deleteFromLibrary = async (stickerId: string) => {
     const usedOn = usedOnIds(stickerId).map(sheetName);
     const where = usedOn.length ? `\n\nIt will also be removed from: ${usedOn.join(', ')}.` : '';
@@ -833,6 +839,7 @@ export default function App() {
                 onCreate={() => createSticker()}
                 onAddToSheet={(id) => place(id, items.length)}
                 onMove={(id, category) => updateSticker(id, { category })}
+                onDuplicate={duplicateSticker}
                 onDelete={deleteFromLibrary}
               />
             </FloatingPane>
