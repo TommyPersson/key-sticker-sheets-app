@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { PrintedPage, StickerSheetEditor, paginate } from '../components/StickerSheet';
 import type { Sheet, Sticker, StickerSize } from '../types';
 import { byId, sampleSheet, sampleStickers } from './fixtures';
+import { SIZES } from '../paper';
 
 interface Args {
   size: StickerSize;
@@ -59,7 +60,7 @@ const meta = {
   title: 'Sheet',
   args: { size: '1.5u', skip: 0, outlines: false, landscape: false, count: 12 },
   argTypes: {
-    size: { control: 'inline-radio', options: ['1.5u', '1u'] },
+    size: { control: 'inline-radio', options: SIZES.map((s) => s.id) },
     count: { control: { type: 'range', min: 0, max: 12 } },
   },
   parameters: { layout: 'fullscreen' },
@@ -84,6 +85,11 @@ export const EditorView: Story = {
 export const EditorView1U: Story = {
   ...EditorView,
   args: { size: '1u' },
+};
+
+export const EditorView2U: Story = {
+  ...EditorView,
+  args: { size: '2u' },
 };
 
 export const EditorWithSkippedSlots: Story = {

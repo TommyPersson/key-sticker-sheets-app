@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Paper } from '@mui/material';
 import { StickerEditor } from '../components/StickerEditor';
-import { defaultDimensions } from '../paper';
+import { SIZES, defaultDimensions } from '../paper';
 import type { StickerSize } from '../types';
 import { sampleStickers } from './fixtures';
 
@@ -37,7 +37,7 @@ const meta = {
   // Remounts on arg changes, so the controls reset the sticker
   render: (args) => <EditorPane key={JSON.stringify(args)} {...args} />,
   args: { size: '1.5u', blank: false },
-  argTypes: { size: { control: 'inline-radio', options: ['1.5u', '1u'] } },
+  argTypes: { size: { control: 'inline-radio', options: SIZES.map((s) => s.id) } },
 } satisfies Meta<Args>;
 
 export default meta;
@@ -46,5 +46,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const OneU: Story = { args: { size: '1u' } };
+
+export const TwoU: Story = { args: { size: '2u' } };
+
+export const TwoAndThreeQuartersU: Story = { args: { size: '2.75u' } };
 
 export const Blank: Story = { args: { blank: true } };

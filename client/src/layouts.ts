@@ -1,3 +1,4 @@
+import { SIZES } from './paper';
 import type { Sticker, StickerSize } from './types';
 
 /**
@@ -72,12 +73,24 @@ const ARRANGEMENTS: Omit<StickerLayout, 'size'>[] = [
       { anchor: 'bottom', components: ['shortcut'] },
     ],
   },
+  // Centered icon, with the icon as large as fits above the shortcut (stickers are 17 mm tall in every size)
+  {
+    id: 'large-icon',
+    name: 'Large icon',
+    iconSize: 8,
+    areas: [
+      { anchor: 'center', components: ['icon'], aboveShortcut: true },
+      { anchor: 'bottom', components: ['shortcut'] },
+    ],
+  },
 ];
 
-/** Every layout for every size. 1.5U ids have no prefix, since 1.5U was the only size at first. */
+/** A size's id for an arrangement. 1.5U ids have no prefix, since 1.5U was the only size at first. */
+const layoutId = (size: StickerSize, arrangement: string) => (size === '1.5u' ? arrangement : `${size}-${arrangement}`);
+
+/** Every layout for every size */
 export const LAYOUTS: StickerLayout[] = [
-  ...ARRANGEMENTS.map((a) => ({ ...a, size: '1.5u' as const })),
-  ...ARRANGEMENTS.map((a) => ({ ...a, id: `1u-${a.id}`, size: '1u' as const })),
+  ...SIZES.flatMap(({ id: size }) => ARRANGEMENTS.map((a) => ({ ...a, id: layoutId(size, a.id), size }))),
   // The square 1U sticker has room to stack the components; one line of text fits between icon and shortcut
   {
     id: '1u-icon-above',
@@ -94,17 +107,6 @@ export const LAYOUTS: StickerLayout[] = [
       { anchor: 'center', components: ['text'], belowIcon: true },
     ],
   },
-  // Centered icon, with the icon as large as fits above the shortcut
-  {
-    id: '1u-large-icon',
-    name: 'Large icon',
-    size: '1u',
-    iconSize: 8,
-    areas: [
-      { anchor: 'center', components: ['icon'], aboveShortcut: true },
-      { anchor: 'bottom', components: ['shortcut'] },
-    ],
-  },
 ];
 
 const byId = new Map(LAYOUTS.map((l) => [l.id, l]));
@@ -113,7 +115,7 @@ const byId = new Map(LAYOUTS.map((l) => [l.id, l]));
 export const layoutsFor = (size: StickerSize) => LAYOUTS.filter((l) => l.size === size);
 
 /** Classic, for the size */
-export const defaultLayout = (size: StickerSize) => (size === '1u' ? '1u-classic' : 'classic');
+export const defaultLayout = (size: StickerSize) => layoutId(size, 'classic');
 
 /** The sticker's layout, falling back to its size's default for unknown ids and layouts of another size */
 export function layoutOf(sticker: Pick<Sticker, 'layout' | 'size'>): StickerLayout {

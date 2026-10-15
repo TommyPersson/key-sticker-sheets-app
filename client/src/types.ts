@@ -1,5 +1,5 @@
 /** Key size a sticker is made for. Each size has its own library, and a sheet holds one size. */
-export type StickerSize = '1u' | '1.5u';
+export type StickerSize = '1u' | '1.25u' | '1.5u' | '1.75u' | '2u' | '2.25u' | '2.75u';
 
 /** A sticker in the global library */
 export interface Sticker {

@@ -378,13 +378,12 @@ function normalizeSticker(input) {
   };
 }
 
-const SIZES = new Set(['1.5u', '1u']);
-const normalizeSize = (size) => (SIZES.has(size) ? size : '1.5u');
+const normalizeSize = (size) => (Object.hasOwn(SIZE_WIDTHS, size) ? size : '1.5u');
 
 /** The size library a sticker belongs to, and its layout id (the client knows the layouts and falls back to the size's default) */
 function sizeAndLayout(input) {
   const size = normalizeSize(input?.size);
-  return { size, layout: str(input?.layout, 64).trim() || (size === '1u' ? '1u-classic' : 'classic') };
+  return { size, layout: str(input?.layout, 64).trim() || (size === '1.5u' ? 'classic' : `${size}-classic`) };
 }
 
 const contentKey = (s) => JSON.stringify([s.line1, s.line2, s.shortcut, s.icon]);
@@ -425,7 +424,7 @@ const DIMENSIONS = {
 };
 
 // Default sticker width per size, keep in sync with SIZES in client/src/paper.ts
-const SIZE_WIDTHS = { '1.5u': 26, '1u': 17 };
+const SIZE_WIDTHS = { '1u': 17, '1.25u': 21.5, '1.5u': 26, '1.75u': 31, '2u': 36, '2.25u': 40.5, '2.75u': 50 };
 
 function normalizeDimensions(input, size) {
   const dimensions = {};

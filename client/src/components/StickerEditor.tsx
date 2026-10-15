@@ -21,7 +21,8 @@ interface Props {
 const PX_PER_MM = 96 / 25.4;
 /** Widest the preview may get inside the side panel, in px */
 const PREVIEW_MAX_WIDTH = 290;
-const LAYOUT_COLUMNS = 3;
+/** Layout thumbnails per row; wide keys get fewer, larger thumbnails */
+const layoutColumns = (cellWidth: number) => (cellWidth > 30 ? 2 : 3);
 const LAYOUT_GAP = 8;
 
 /** Shown in the layout thumbnails while the sticker has no content */
@@ -38,7 +39,8 @@ export function StickerEditor({ sticker, dimensions, usedOn, categories, onChang
   }, [sticker.category]);
 
   const previewZoom = Math.min(2, PREVIEW_MAX_WIDTH / (dimensions.cellWidth * PX_PER_MM));
-  const thumbWidth = (PREVIEW_MAX_WIDTH - (LAYOUT_COLUMNS - 1) * LAYOUT_GAP) / LAYOUT_COLUMNS;
+  const columns = layoutColumns(dimensions.cellWidth);
+  const thumbWidth = (PREVIEW_MAX_WIDTH - (columns - 1) * LAYOUT_GAP) / columns;
   // Layout thumbnails fill their column; the frame adds 2px padding and a 2px border on each side
   const THUMB_FRAME = 8;
   const thumbZoom = (thumbWidth - THUMB_FRAME) / (dimensions.cellWidth * PX_PER_MM);
@@ -152,7 +154,7 @@ export function StickerEditor({ sticker, dimensions, usedOn, categories, onChang
         <Box
           role="radiogroup"
           aria-label="Layout"
-          sx={{ display: 'grid', gridTemplateColumns: `repeat(${LAYOUT_COLUMNS}, 1fr)`, gap: `${LAYOUT_GAP}px` }}
+          sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: `${LAYOUT_GAP}px` }}
         >
           {layoutsFor(sticker.size).map((layout) => {
             const selected = layout.id === current.id;

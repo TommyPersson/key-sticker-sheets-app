@@ -34,10 +34,25 @@ export const DEFAULT_DIMENSIONS: SheetDimensions = {
   markerSize: 10,
 };
 
+/**
+ * Key sizes, smallest first. The default sticker width leaves about 2 mm of the key's 19.05 mm
+ * per unit pitch (1.5U keeps the PoC's 26 mm). Keep in sync with SIZE_WIDTHS in server/src/storage.js.
+ */
 export const SIZES: { id: StickerSize; label: string; width: number }[] = [
-  { id: '1.5u', label: '1.5U', width: 26 },
   { id: '1u', label: '1U', width: 17 },
+  { id: '1.25u', label: '1.25U', width: 21.5 },
+  { id: '1.5u', label: '1.5U', width: 26 },
+  { id: '1.75u', label: '1.75U', width: 31 },
+  { id: '2u', label: '2U', width: 36 },
+  { id: '2.25u', label: '2.25U', width: 40.5 },
+  { id: '2.75u', label: '2.75U', width: 50 },
 ];
+
+export const DEFAULT_SIZE: StickerSize = '1.5u';
+
+/** The size with the given id, or the default size for anything else */
+export const normalizeSize = (value: unknown): StickerSize =>
+  SIZES.find((s) => s.id === value)?.id ?? DEFAULT_SIZE;
 
 /** Default geometry for a sheet of one size: the stickers get the size's width */
 export const defaultDimensions = (size: StickerSize): SheetDimensions => ({

@@ -49,7 +49,9 @@ interface Props {
 }
 
 const PX_PER_MM = 96 / 25.4;
+/** Narrowest card; cards for keys wider than 1.5U grow to keep the 1.5U sticker scale */
 const CARD_WIDTH = 112;
+const CARD_SCALE_WIDTH = 26;
 /** A card's 4px padding and 1px border on each side */
 const CARD_FRAME = 10;
 
@@ -146,7 +148,8 @@ export function Library({
   const current = menu?.sticker.category.trim() ?? '';
   const moveTargets = [...categories.filter((c) => c !== current), ...(current ? [''] : [])];
 
-  const zoom = (CARD_WIDTH - CARD_FRAME) / (dimensions.cellWidth * PX_PER_MM);
+  const cardWidth = Math.round(CARD_FRAME + ((CARD_WIDTH - CARD_FRAME) * Math.max(dimensions.cellWidth, CARD_SCALE_WIDTH)) / CARD_SCALE_WIDTH);
+  const zoom = (cardWidth - CARD_FRAME) / (dimensions.cellWidth * PX_PER_MM);
   const cardHeight = dimensions.cellHeight * PX_PER_MM * zoom + CARD_FRAME;
   const filters: [Filter, string][] = [
     ['all', 'All'],
@@ -221,7 +224,7 @@ export function Library({
           px: 2,
           pb: 2,
           display: 'grid',
-          gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_WIDTH}px, 1fr))`,
+          gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
           gap: 1,
           alignContent: 'start',
         }}

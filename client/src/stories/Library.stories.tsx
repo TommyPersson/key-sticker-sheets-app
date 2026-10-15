@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Paper } from '@mui/material';
 import { Library } from '../components/Library';
-import { defaultDimensions } from '../paper';
+import { SIZES, defaultDimensions } from '../paper';
 import type { StickerSize } from '../types';
 import { byId, sampleStickers } from './fixtures';
 
@@ -45,7 +45,7 @@ const meta = {
   render: (args) => <LibraryPane key={args.size} {...args} />,
   args: { size: '1.5u', hasSheet: true, width: 400 },
   argTypes: {
-    size: { control: 'inline-radio', options: ['1.5u', '1u'] },
+    size: { control: 'inline-radio', options: SIZES.map((s) => s.id) },
     width: { control: { type: 'range', min: 280, max: 1000, step: 120 } },
   },
 } satisfies Meta<typeof LibraryPane>;
@@ -56,5 +56,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const OneU: Story = { args: { size: '1u' } };
+
+export const TwoU: Story = { args: { size: '2u' } };
+
+export const TwoAndThreeQuartersU: Story = { args: { size: '2.75u' } };
 
 export const WithoutSheet: Story = { args: { hasSheet: false } };

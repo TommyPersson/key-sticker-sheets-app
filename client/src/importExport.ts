@@ -1,4 +1,5 @@
 import { layoutOf } from './layouts';
+import { normalizeSize } from './paper';
 import type { Sheet, SheetSettings, Sticker } from './types';
 
 export type StickerContent = Pick<Sticker, 'line1' | 'line2' | 'shortcut' | 'icon' | 'category' | 'size' | 'layout'>;
@@ -48,7 +49,7 @@ export function parseImport(json: string, fallbackName: string): SheetFile {
   const data = JSON.parse(json);
   const rawStickers: unknown[] | undefined = Array.isArray(data) ? data : data?.stickers;
   if (!Array.isArray(rawStickers)) throw new Error('Expected a sheet object or an array of stickers');
-  const size = data?.settings?.size === '1u' ? '1u' : '1.5u';
+  const size = normalizeSize(data?.settings?.size);
 
   return {
     name: text(data?.name) || fallbackName,

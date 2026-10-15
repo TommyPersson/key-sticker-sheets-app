@@ -43,7 +43,7 @@ import { SheetPlacement, type PlacementActions } from './components/SheetPlaceme
 import { IconPicker } from './components/IconPicker';
 import { StickerSheetEditor, StickerSheetPrint, perPage } from './components/StickerSheet';
 import { PageSetup } from './components/PageSetup';
-import { defaultDimensions, dimensionsOf, gridFor, paperSize, sizeLabel } from './paper';
+import { DEFAULT_SIZE, defaultDimensions, dimensionsOf, gridFor, normalizeSize, paperSize, sizeLabel } from './paper';
 import { contentKey, parseImport, toSheetFile } from './importExport';
 import { defaultLayout } from './layouts';
 import { useWorkspace, type SaveStatus } from './useWorkspace';
@@ -131,9 +131,7 @@ export default function App() {
   });
   const libraryPaneWidth = libraryWidth(libraryColumns);
   /** Size of the last open sheet, whose library stays shown while no sheet is open */
-  const [lastSize, setLastSize] = useState<StickerSize>(() =>
-    stored<string>('ks-library-size', '1.5u') === '1u' ? '1u' : '1.5u',
-  );
+  const [lastSize, setLastSize] = useState<StickerSize>(() => normalizeSize(stored('ks-library-size', DEFAULT_SIZE)));
   const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', String(DEFAULT_ZOOM))) || DEFAULT_ZOOM);
   const [message, setMessage] = useState<{ text: string; severity: 'error' | 'success' } | null>(null);
 

@@ -1,5 +1,5 @@
 import { sheetSummary } from '../api';
-import { defaultDimensions } from '../paper';
+import { defaultDimensions, normalizeSize } from '../paper';
 import type { IconInfo, Sheet, SheetSettings, Sticker } from '../types';
 
 /**
@@ -31,7 +31,7 @@ const json = (body: unknown, status = 200) =>
 
 /** Fills in what the server would: default settings for the sheet's size */
 const normalizeSettings = (settings: Partial<SheetSettings> = {}): SheetSettings => {
-  const size = settings.size === '1u' ? '1u' : '1.5u';
+  const size = normalizeSize(settings.size);
   return {
     skip: 0,
     outlines: false,
