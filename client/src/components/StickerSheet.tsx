@@ -167,12 +167,26 @@ export function StickerFace({
     ),
     shortcut: sticker.shortcut && <span className="ks-shortcut">{sticker.shortcut}</span>,
   };
+  const areas = (!sticker.shortcut && layout.withoutShortcut) || layout.areas;
   return (
     <>
-      {layout.areas.map((area) => {
+      {areas.map((area) => {
         const [h, v] = ANCHOR_ALIGNMENT[area.anchor];
         return (
-          <div key={area.anchor} className={`ks-area${area.row ? ' row' : ''}`} data-h={h} data-v={v}>
+          <div
+            key={area.anchor}
+            className={[
+              'ks-area',
+              area.row && 'row',
+              area.aboveShortcut && sticker.shortcut && 'above-shortcut',
+              area.belowIcon && sticker.icon && 'below-icon',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            style={layout.iconSize ? ({ '--icon-size': `${layout.iconSize}mm` } as React.CSSProperties) : undefined}
+            data-h={h}
+            data-v={v}
+          >
             {area.components.map((c) => (
               <Fragment key={c}>{components[c]}</Fragment>
             ))}

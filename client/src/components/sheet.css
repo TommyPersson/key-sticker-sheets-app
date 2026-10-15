@@ -85,6 +85,16 @@
   gap: 1mm;
 }
 
+/* Leaves room for the shortcut line (7pt) below the area */
+.ks-area.above-shortcut {
+  bottom: calc(2mm + 3.2mm);
+}
+
+/* Leaves room for a top-anchored icon (and a 1mm gap) above the area */
+.ks-area.below-icon {
+  top: calc(2mm + var(--icon-size, 16px) + 1mm);
+}
+
 .ks-area.row {
   flex-direction: row;
   gap: 1.5mm;

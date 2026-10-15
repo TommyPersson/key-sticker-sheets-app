@@ -25,6 +25,10 @@ export interface LayoutArea {
   anchor: Anchor;
   components: StickerComponent[];
   row?: boolean;
+  /** Keeps the area above the shortcut line, e.g. to centre it in that space; ignored when there is no shortcut */
+  aboveShortcut?: boolean;
+  /** Keeps the area below a top-anchored icon, e.g. to centre it in that space; ignored when there is no icon */
+  belowIcon?: boolean;
 }
 
 export interface StickerLayout {
@@ -34,6 +38,8 @@ export interface StickerLayout {
   size: StickerSize;
   /** Each component appears in at most one area; components left out are not shown */
   areas: LayoutArea[];
+  /** Areas used instead when the sticker has no shortcut */
+  withoutShortcut?: LayoutArea[];
   /** Icon size in mm, scaled to fit; by default icons are at most 16px (about 4.2 mm) */
   iconSize?: number;
 }
@@ -53,7 +59,8 @@ const ARRANGEMENTS: Omit<StickerLayout, 'size'>[] = [
     id: 'centered-text',
     name: 'Centered text',
     areas: [
-      { anchor: 'center', components: ['text'] },
+      // Centred in the space above the shortcut, which balances better than the sticker's centre
+      { anchor: 'center', components: ['text'], aboveShortcut: true },
       { anchor: 'bottom', components: ['shortcut'] },
     ],
   },
@@ -61,7 +68,7 @@ const ARRANGEMENTS: Omit<StickerLayout, 'size'>[] = [
     id: 'centered-icon',
     name: 'Centered icon',
     areas: [
-      { anchor: 'center', components: ['icon'] },
+      { anchor: 'center', components: ['icon'], aboveShortcut: true },
       { anchor: 'bottom', components: ['shortcut'] },
     ],
   },
@@ -81,6 +88,11 @@ export const LAYOUTS: StickerLayout[] = [
       { anchor: 'center', components: ['text'] },
       { anchor: 'bottom', components: ['shortcut'] },
     ],
+    // The text moves down into the shortcut's space, centred below the icon, leaving room for two lines
+    withoutShortcut: [
+      { anchor: 'top', components: ['icon'] },
+      { anchor: 'center', components: ['text'], belowIcon: true },
+    ],
   },
   // Centered icon, with the icon as large as fits above the shortcut
   {
@@ -89,7 +101,7 @@ export const LAYOUTS: StickerLayout[] = [
     size: '1u',
     iconSize: 8,
     areas: [
-      { anchor: 'top', components: ['icon'] },
+      { anchor: 'center', components: ['icon'], aboveShortcut: true },
       { anchor: 'bottom', components: ['shortcut'] },
     ],
   },

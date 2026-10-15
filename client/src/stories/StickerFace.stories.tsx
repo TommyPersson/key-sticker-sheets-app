@@ -44,25 +44,40 @@ const stickerOf = (args: Args, size: StickerSize, layout: string): Sticker => ({
 
 const meta = {
   title: 'Sticker/Layouts',
-  args: { line1: 'STEP', line2: 'OVER', shortcut: 'F8', icon: 'intellij/stepOver.svg', zoom: 3 },
+  args: { line1: 'STEP', line2: 'OVER', shortcut: 'F8', icon: 'intellij/stepOver.svg', zoom: 2 },
   argTypes: { zoom: { control: { type: 'range', min: 1, max: 6, step: 0.5 } } },
 } satisfies Meta<Args>;
 
 export default meta;
 type Story = StoryObj<Args>;
 
-/** Every layout of every size, with the same content */
+/** Every layout of every size with the same content: one or two text lines, with and without a shortcut */
 export const AllLayouts: Story = {
   render: (args) => (
     <div style={{ display: 'grid', gap: 24 }}>
       {SIZES.map((size) => (
         <section key={size.id}>
           <h3 style={{ font: 'bold 14px sans-serif', margin: '0 0 8px' }}>{size.label}</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-            {layoutsFor(size.id).map((layout) => (
-              <Preview key={layout.id} sticker={stickerOf(args, size.id, layout.id)} layoutId={layout.id} zoom={args.zoom} />
-            ))}
-          </div>
+          {[
+            { label: 'Two lines, with shortcut', content: args },
+            { label: 'One line, with shortcut', content: { ...args, line2: '' } },
+            { label: 'Two lines, without shortcut', content: { ...args, shortcut: '' } },
+            { label: 'One line, without shortcut', content: { ...args, line2: '', shortcut: '' } },
+          ].map(({ label, content }) => (
+            <div key={label} style={{ marginBottom: 16 }}>
+              <h4 style={{ font: '12px sans-serif', color: '#666', margin: '0 0 6px' }}>{label}</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                {layoutsFor(size.id).map((layout) => (
+                  <Preview
+                    key={layout.id}
+                    sticker={stickerOf(content, size.id, layout.id)}
+                    layoutId={layout.id}
+                    zoom={args.zoom}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </section>
       ))}
     </div>
