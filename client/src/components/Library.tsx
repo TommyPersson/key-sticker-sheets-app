@@ -20,6 +20,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import LabelIcon from '@mui/icons-material/LabelOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import CheckIcon from '@mui/icons-material/Check';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -268,7 +269,6 @@ export function Library({
               </ButtonBase>
             )}
             {!(categories.length > 0 && collapsed.has(name)) && members.map((sticker) => {
-              const placed = onSheet.get(sticker.id) ?? 0;
               const sheets = sheetCount(sticker.id);
               return (
                 <Box
@@ -329,13 +329,13 @@ export function Library({
                   >
                     <MoreVertIcon sx={{ fontSize: 16 }} />
                   </IconButton>
-                  {placed > 0 && (
-                    <Chip
-                      size="small"
-                      color="success"
-                      label={placed > 1 ? `×${placed}` : '✓'}
-                      sx={{ position: 'absolute', bottom: 2, right: 2, height: 16, fontSize: 10, '& .MuiChip-label': { px: 0.6 } }}
-                    />
+                  {onSheet.has(sticker.id) && (
+                    <Tooltip title="On this sheet">
+                      <CheckIcon
+                        aria-label="On this sheet"
+                        sx={{ position: 'absolute', bottom: 3, right: 3, fontSize: 14, color: 'text.disabled' }}
+                      />
+                    </Tooltip>
                   )}
                 </Box>
               );
