@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AppBar,
@@ -23,6 +23,8 @@ import ContentCutIcon from '@mui/icons-material/ContentCut';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import FitScreenIcon from '@mui/icons-material/FitScreen';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -31,8 +33,9 @@ import ImageIcon from '@mui/icons-material/Image';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
-import { api } from './api';
+import { api, sheetSummary } from './api';
 import { NewSheetButton, SheetList, SheetListActions } from './components/SheetList';
+import { SizeChip } from './components/SheetChips';
 import { Library, categoriesOf } from './components/Library';
 import { FloatingColumn, FloatingPane, paneClearance } from './components/FloatingPane';
 import { StickerEditor } from './components/StickerEditor';
@@ -40,7 +43,7 @@ import { SheetPlacement, type PlacementActions } from './components/SheetPlaceme
 import { IconPicker } from './components/IconPicker';
 import { StickerSheetEditor, StickerSheetPrint, perPage } from './components/StickerSheet';
 import { PageSetup } from './components/PageSetup';
-import { defaultDimensions, dimensionsOf, gridFor, sizeLabel } from './paper';
+import { defaultDimensions, dimensionsOf, gridFor, paperSize, sizeLabel } from './paper';
 import { contentKey, parseImport, toSheetFile } from './importExport';
 import { defaultLayout } from './layouts';
 import { useWorkspace, type SaveStatus } from './useWorkspace';
@@ -53,6 +56,23 @@ const LIBRARY_COLUMN_WIDTH = 120;
 const libraryWidth = (columns: number) => 40 + columns * LIBRARY_COLUMN_WIDTH;
 const LIBRARY_COLUMNS = { min: 2, max: 8, default: 3 };
 const EDITOR_WIDTH = 340;
+/** Preview zoom at first start and after resetting it */
+const DEFAULT_ZOOM = 1;
+/** The zoom buttons snap to multiples of this, in percent */
+const ZOOM_STEP = 25;
+const MAX_ZOOM = 3;
+/** Smallest zoom the buttons step down to; fitting a page may go further, down to MIN_FIT_ZOOM */
+const MIN_ZOOM = 0.5;
+const MIN_FIT_ZOOM = 0.25;
+const PX_PER_MM = 96 / 25.4;
+
+/** The next zoom step above (+1) or below (-1) the zoom, e.g. 102% → 125% or 100% */
+function snapZoom(zoom: number, direction: 1 | -1) {
+  // In whole percent, so float noise can't skip or repeat a step
+  const percent = Math.round(zoom * 100) / ZOOM_STEP;
+  const step = direction > 0 ? Math.floor(percent) + 1 : Math.ceil(percent) - 1;
+  return (step * ZOOM_STEP) / 100;
+}
 /** Space between the editor and the library pane (px) */
 const EDITOR_GAP = 12;
 
@@ -114,7 +134,7 @@ export default function App() {
   const [lastSize, setLastSize] = useState<StickerSize>(() =>
     stored<string>('ks-library-size', '1.5u') === '1u' ? '1u' : '1.5u',
   );
-  const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', '1.25')) || 1.25);
+  const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', String(DEFAULT_ZOOM))) || DEFAULT_ZOOM);
   const [message, setMessage] = useState<{ text: string; severity: 'error' | 'success' } | null>(null);
 
   const showError = useCallback((text: string) => setMessage({ text, severity: 'error' }), []);
@@ -122,15 +142,7 @@ export default function App() {
     setSheets(
       (list) =>
         list?.map((s) =>
-          s.id === saved.id
-            ? {
-                id: saved.id,
-                name: saved.name,
-                stickerCount: saved.items.length,
-                size: saved.settings.size,
-                updatedAt: saved.updatedAt,
-              }
-            : s,
+          s.id === saved.id ? sheetSummary(saved) : s,
         ) ?? null,
     );
   }, []);
@@ -138,6 +150,9 @@ export default function App() {
   const { sheet, stickers, edit } = ws;
 
   useEffect(() => store('ks-zoom', String(zoom)), [zoom]);
+
+  /** The scrolling canvas the sheet is shown in */
+  const canvasRef = useRef<HTMLDivElement>(null);
   useEffect(() => store('ks-library-columns', String(libraryColumns)), [libraryColumns]);
   useEffect(() => {
     if (sheet) setLastSize(sheet.settings.size);
@@ -545,6 +560,18 @@ export default function App() {
     }
   };
 
+  /** Zooms so one whole page fits the visible canvas, between the floating panes */
+  const fitPage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !sheet) return;
+    const style = getComputedStyle(canvas);
+    const width = canvas.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const height = canvas.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    const paper = paperSize(sheet.settings);
+    const fit = Math.min(width / (paper.width * PX_PER_MM), height / (paper.height * PX_PER_MM));
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_FIT_ZOOM, Math.floor(fit * 100) / 100)));
+  };
+
   // ---------- Render ----------
 
   const pageCount = sheet ? Math.max(1, Math.ceil((sheet.settings.skip + items.length) / perPage(sheet.settings))) : 0;
@@ -608,7 +635,8 @@ export default function App() {
               <Stack direction="row" sx={{ alignItems: 'center' }}>
                 <IconButton
                   color="inherit"
-                  onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                  // Never zooms in, even when fitting a page went below the minimum
+                  onClick={() => setZoom((z) => Math.min(z, Math.max(MIN_ZOOM, snapZoom(z, -1))))}
                   aria-label="Zoom out"
                 >
                   <ZoomOutIcon />
@@ -618,11 +646,29 @@ export default function App() {
                 </Typography>
                 <IconButton
                   color="inherit"
-                  onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                  onClick={() => setZoom((z) => Math.min(MAX_ZOOM, snapZoom(z, 1)))}
                   aria-label="Zoom in"
                 >
                   <ZoomInIcon />
                 </IconButton>
+                <Tooltip title="Fit page">
+                  <IconButton color="inherit" onClick={fitPage} aria-label="Fit page">
+                    <FitScreenIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={`Reset zoom (${DEFAULT_ZOOM * 100}%)`}>
+                  <span>
+                    <IconButton
+                      color="inherit"
+                      onClick={() => setZoom(DEFAULT_ZOOM)}
+                      disabled={zoom === DEFAULT_ZOOM}
+                      aria-label="Reset zoom"
+                      sx={{ '&.Mui-disabled': { color: 'inherit', opacity: 0.4 } }}
+                    >
+                      <RestartAltIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Stack>
               <Tooltip title="Download an xTool Studio project that knife-cuts the printed stickers">
                 <span>
@@ -658,6 +704,7 @@ export default function App() {
             {sheet ? (
               <>
                 <Box
+                  ref={canvasRef}
                   sx={{
                     height: '100%',
                     overflow: 'auto',
@@ -755,7 +802,8 @@ export default function App() {
               )}
             </FloatingPane>
             <FloatingPane
-              title={`Library · ${sizeLabel(librarySize)} (${Object.keys(libraryStickers).length})`}
+              title={`Library (${Object.keys(libraryStickers).length})`}
+              titleAdornment={<SizeChip size={librarySize} />}
               icon={<CollectionsBookmarkIcon />}
               side="right"
               width={libraryPaneWidth}

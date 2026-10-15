@@ -75,6 +75,9 @@ export interface SheetSummary {
   name: string;
   stickerCount: number;
   size: StickerSize;
+  /** Paper size id, see paper.ts */
+  paper: string;
+  landscape: boolean;
   updatedAt?: string;
 }
 

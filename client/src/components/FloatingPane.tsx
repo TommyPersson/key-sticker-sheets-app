@@ -36,6 +36,8 @@ interface Props extends Anchor {
   fitContent?: boolean;
   /** Placed inside a FloatingColumn instead of positioning itself */
   inline?: boolean;
+  /** Shown right after the title, e.g. a chip */
+  titleAdornment?: React.ReactNode;
   /** Extra buttons in the title bar, before the dismiss button */
   actions?: React.ReactNode;
   /** Makes the inner edge draggable; called with the width the drag asks for (px) */
@@ -57,6 +59,7 @@ export function FloatingPane({
   topOffset,
   fitContent = false,
   inline = false,
+  titleAdornment,
   actions,
   onResize,
 }: Props) {
@@ -127,9 +130,12 @@ export function FloatingPane({
         }}
       >
         <Box sx={{ display: 'flex', mr: 1, color: 'action.active', '& svg': { fontSize: 20 } }}>{icon}</Box>
-        <Typography variant="subtitle2" sx={{ flex: 1 }}>
-          {title}
-        </Typography>
+        <Stack direction="row" spacing={1} sx={{ flex: 1, alignItems: 'center', minWidth: 0 }}>
+          <Typography variant="subtitle2" noWrap>
+            {title}
+          </Typography>
+          {titleAdornment}
+        </Stack>
         {actions}
         {onClose && (
           <Tooltip title="Close (Esc)">

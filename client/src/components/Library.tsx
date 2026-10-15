@@ -12,6 +12,7 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -161,24 +162,29 @@ export function Library({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Stack spacing={1.5} sx={{ p: 2, pb: 1 }}>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={onCreate}>
-          New sticker
-        </Button>
-        <TextField
-          size="small"
-          placeholder="Search stickers"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            placeholder="Search stickers"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ flex: 1 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <Tooltip title="New sticker">
+            <Button variant="contained" onClick={onCreate} aria-label="New sticker" sx={{ minWidth: 40, px: 0 }}>
+              <AddIcon />
+            </Button>
+          </Tooltip>
+        </Stack>
         <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5 }}>
           {filters.map(([value, label]) => (
             <Chip

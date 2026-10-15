@@ -172,7 +172,16 @@ export class Storage {
   async listSheets() {
     const sheets = await this.readAllSheets();
     return sheets
-      .map((s) => ({ id: s.id, name: s.name, stickerCount: s.items.length, size: s.settings.size, updatedAt: s.updatedAt }))
+      // Keep in sync with sheetSummary in client/src/api.ts
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        stickerCount: s.items.length,
+        size: s.settings.size,
+        paper: s.settings.paper,
+        landscape: s.settings.landscape,
+        updatedAt: s.updatedAt,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 

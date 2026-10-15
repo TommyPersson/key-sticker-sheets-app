@@ -1,5 +1,16 @@
 import type { IconInfo, LibrarySticker, Sheet, SheetSummary, Sticker } from './types';
 
+/** A sheet as the sheet list shows it; keep in sync with listSheets in server/src/storage.js */
+export const sheetSummary = (s: Sheet): SheetSummary => ({
+  id: s.id,
+  name: s.name,
+  stickerCount: s.items.length,
+  size: s.settings.size,
+  paper: s.settings.paper,
+  landscape: s.settings.landscape,
+  updatedAt: s.updatedAt,
+});
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {

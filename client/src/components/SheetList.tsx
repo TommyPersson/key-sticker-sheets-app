@@ -11,6 +11,7 @@ import {
   ListSubheader,
   Menu,
   MenuItem,
+  Stack,
   Tooltip,
   Typography,
   type SxProps,
@@ -24,7 +25,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import { SIZES, sizeLabel } from '../paper';
+import { SIZES } from '../paper';
+import { PaperChip, SizeChip } from './SheetChips';
 import type { SheetSummary, StickerSize } from '../types';
 
 /** Menu to pick a new sheet's key size */
@@ -157,8 +159,17 @@ export function SheetList({
           >
             <ListItemText
               primary={s.name}
-              secondary={`${sizeLabel(s.size)} · ${s.stickerCount} sticker${s.stickerCount === 1 ? '' : 's'}`}
-              slotProps={{ primary: { noWrap: true } }}
+              secondary={
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mt: 0.25 }}>
+                  <SizeChip size={s.size} />
+                  <PaperChip paper={s.paper} landscape={s.landscape} />
+                  <span>
+                    {s.stickerCount} sticker{s.stickerCount === 1 ? '' : 's'}
+                  </span>
+                </Stack>
+              }
+              // A div, since the secondary line holds a chip
+              slotProps={{ primary: { noWrap: true }, secondary: { component: 'div' } }}
             />
             <IconButton
               size="small"

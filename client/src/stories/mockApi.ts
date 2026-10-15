@@ -1,3 +1,4 @@
+import { sheetSummary } from '../api';
 import { defaultDimensions } from '../paper';
 import type { IconInfo, Sheet, SheetSettings, Sticker } from '../types';
 
@@ -55,7 +56,7 @@ export function installMockApi(initial: MockData): () => void {
 
     if (resource === 'sheets') {
       if (!id && method === 'GET') {
-        return json(sheets.map((s) => ({ id: s.id, name: s.name, stickerCount: s.items.length, size: s.settings.size, updatedAt: s.updatedAt })));
+        return json(sheets.map(sheetSummary));
       }
       if (!id && method === 'POST') {
         const input = body as Partial<Sheet>;
