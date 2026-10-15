@@ -26,7 +26,7 @@ On first start, when `/data/sheets` or `/data/icons` don't exist yet, they're se
 
 Sheets from earlier versions embedded their stickers. On startup they're migrated automatically: their stickers move into the library (identical stickers become one entry) and the sheets keep references to them.
 
-To use a host directory instead of a named volume, use `-v ./data:/data`. The container runs as the `node` user (uid 1000), so the directory must be writable by that user.
+To use a host directory instead of a named volume, use `-v ./data:/data`. The app runs as the `node` user (uid 1000); on startup the container gives that user ownership of the data directory, including a host directory that Docker created as root. If that isn't possible (e.g. a root-squashed NFS share), make the directory writable for uid 1000. When the container is started as another user (`--user`), it runs as that user and leaves ownership alone.
 
 ### Published images
 

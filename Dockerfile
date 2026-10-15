@@ -20,10 +20,12 @@ COPY server/src ./src
 COPY server/seed ./seed
 COPY --from=client /build/dist ./public
 
-# The data directory is owned by the unprivileged user so a fresh named volume inherits it
-RUN mkdir -p /data && chown node:node /data
-USER node
+# The app runs as the unprivileged node user. The entrypoint starts as root to give that user the
+# data directory (bind-mounted host directories are created as root), then drops privileges.
+RUN apk add --no-cache su-exec && mkdir -p /data && chown node:node /data
+COPY --chmod=755 server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 VOLUME /data
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/api/health || exit 1
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "src/index.js"]
