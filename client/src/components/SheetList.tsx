@@ -11,7 +11,7 @@ import {
   ListSubheader,
   Menu,
   MenuItem,
-  Stack,
+  Tooltip,
   Typography,
   type SxProps,
   type Theme,
@@ -27,7 +27,39 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import { SIZES, sizeLabel } from '../paper';
 import type { SheetSummary, StickerSize } from '../types';
 
-/** "New sheet" button with a menu to pick the new sheet's key size */
+/** Menu to pick a new sheet's key size */
+function NewSheetMenu({
+  anchor,
+  onClose,
+  onCreate,
+}: {
+  anchor: HTMLElement | null;
+  onClose: () => void;
+  onCreate: (size: StickerSize) => void;
+}) {
+  return (
+    <Menu
+      anchorEl={anchor}
+      open={!!anchor}
+      onClose={onClose}
+      slotProps={{ paper: { sx: { minWidth: anchor?.offsetWidth } } }}
+    >
+      {SIZES.map((size) => (
+        <MenuItem
+          key={size.id}
+          onClick={() => {
+            onClose();
+            onCreate(size.id);
+          }}
+        >
+          {size.label} sheet
+        </MenuItem>
+      ))}
+    </Menu>
+  );
+}
+
+/** "New sheet" button with a menu to pick the new sheet's key size, for the empty workspace */
 export function NewSheetButton({ onCreate, sx }: { onCreate: (size: StickerSize) => void; sx?: SxProps<Theme> }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   return (
@@ -42,24 +74,45 @@ export function NewSheetButton({ onCreate, sx }: { onCreate: (size: StickerSize)
       >
         New sheet
       </Button>
-      <Menu
-        anchorEl={anchor}
-        open={!!anchor}
-        onClose={() => setAnchor(null)}
-        slotProps={{ paper: { sx: { minWidth: anchor?.offsetWidth } } }}
-      >
-        {SIZES.map((size) => (
-          <MenuItem
-            key={size.id}
-            onClick={() => {
-              setAnchor(null);
-              onCreate(size.id);
-            }}
-          >
-            {size.label} sheet
-          </MenuItem>
-        ))}
-      </Menu>
+      <NewSheetMenu anchor={anchor} onClose={() => setAnchor(null)} onCreate={onCreate} />
+    </>
+  );
+}
+
+/** Title bar buttons of the sheets pane: new sheet (with its size menu) and import */
+export function SheetListActions({
+  onCreate,
+  onImport,
+}: {
+  onCreate: (size: StickerSize) => void;
+  onImport: (file: File) => void;
+}) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <Tooltip title="New sheet">
+        <IconButton size="small" onClick={(e) => setAnchor(e.currentTarget)} aria-label="New sheet" aria-haspopup="menu">
+          <AddIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <NewSheetMenu anchor={anchor} onClose={() => setAnchor(null)} onCreate={onCreate} />
+      <Tooltip title="Import sheet from JSON">
+        <IconButton size="small" onClick={() => fileInput.current?.click()} aria-label="Import sheet from JSON">
+          <FileUploadIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onImport(file);
+          e.target.value = '';
+        }}
+      />
     </>
   );
 }
@@ -68,8 +121,6 @@ interface Props {
   sheets: SheetSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onCreate: (size: StickerSize) => void;
-  onImport: (file: File) => void;
   onDuplicate: (id: string) => void;
   onExport: (id: string) => void;
   onDelete: (id: string) => void;
@@ -81,8 +132,6 @@ export function SheetList({
   sheets,
   selectedId,
   onSelect,
-  onCreate,
-  onImport,
   onDuplicate,
   onExport,
   onDelete,
@@ -90,7 +139,6 @@ export function SheetList({
 }: Props) {
   const [menu, setMenu] = useState<{ anchor: HTMLElement; id: string } | null>(null);
   const menuSheet = sheets.find((s) => s.id === menu?.id);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const act = (fn: (id: string) => void) => () => {
     if (menu) fn(menu.id);
@@ -99,24 +147,7 @@ export function SheetList({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Stack direction="row" spacing={1} sx={{ p: 2 }}>
-        <NewSheetButton onCreate={onCreate} sx={{ flex: 1 }} />
-        <IconButton onClick={() => fileInput.current?.click()} title="Import sheet from JSON">
-          <FileUploadIcon />
-        </IconButton>
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".json,application/json"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onImport(file);
-            e.target.value = '';
-          }}
-        />
-      </Stack>
-      <List dense sx={{ flex: 1, overflowY: 'auto', pt: 0 }}>
+      <List dense sx={{ flex: 1, overflowY: 'auto' }}>
         {sheets.map((s) => (
           <ListItemButton
             key={s.id}
@@ -143,7 +174,7 @@ export function SheetList({
           </ListItemButton>
         ))}
         {sheets.length === 0 && (
-          <Typography variant="body2" color="text.secondary" sx={{ px: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1 }}>
             No sheets yet.
           </Typography>
         )}

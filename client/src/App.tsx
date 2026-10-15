@@ -32,7 +32,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import { api } from './api';
-import { NewSheetButton, SheetList } from './components/SheetList';
+import { NewSheetButton, SheetList, SheetListActions } from './components/SheetList';
 import { Library, categoriesOf } from './components/Library';
 import { FloatingColumn, FloatingPane, paneClearance } from './components/FloatingPane';
 import { StickerEditor } from './components/StickerEditor';
@@ -736,6 +736,7 @@ export default function App() {
               icon={<DescriptionIcon />}
               side="left"
               width={SHEETS_WIDTH}
+              actions={<SheetListActions onCreate={createEmptySheet} onImport={importSheet} />}
             >
               {sheets === null ? (
                 <Box sx={{ p: 4, textAlign: 'center' }}>
@@ -746,8 +747,6 @@ export default function App() {
                   sheets={sheets}
                   selectedId={sheet?.id ?? null}
                   onSelect={openSheet}
-                  onCreate={createEmptySheet}
-                  onImport={importSheet}
                   onDuplicate={duplicateSheet}
                   onExport={exportSheet}
                   onDelete={deleteSheet}

@@ -45,7 +45,7 @@ npm run storybook          # http://localhost:6006
 npm run build-storybook    # static build in client/storybook-static
 ```
 
-Stories live in `client/src/stories`: every sticker layout per size (with editable content and edge cases), the sheet editor (interactive: select, swap, move, remove) and printed page, and the library, sticker editor, sheet list and page setup panels. Sample data is in `fixtures.ts`; icons are served from `server/seed/icons`.
+Stories live in `client/src/stories`: the whole workspace, running against an in-memory mock of the API (`mockApi.ts`) with sample sheets, so edits work without the server; every sticker layout per size (with editable content and edge cases), the sheet editor (interactive: select, swap, move, remove) and printed page, and the library, sticker editor, sheet list and page setup panels. Sample data is in `fixtures.ts`; icons are served from `server/seed/icons`.
 
 ## Features
 
