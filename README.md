@@ -25,6 +25,14 @@ Sheets from earlier versions embedded their stickers. On startup they're migrate
 
 To use a host directory instead of a named volume, use `-v ./data:/data`. The container runs as the `node` user (uid 1000), so the directory must be writable by that user.
 
+### Published images
+
+CI tags each successful build on `main` with the next version (`v1`, `v2`, ...). The manual **Publish image** workflow (Actions tab) pushes a version to the GitHub Container Registry, the newest one unless another is given, and by default also tags it `latest`:
+
+```bash
+docker run -d -p 3000:3000 -v sticker-data:/data ghcr.io/tommypersson/key-sticker-sheets-app:latest
+```
+
 ## Development
 
 ```bash
