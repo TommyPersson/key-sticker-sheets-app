@@ -1,7 +1,7 @@
 services:
-  key-sticker-sheets:
+  key-sticker-sheets-app:
     build: .
-    image: key-sticker-sheets
+    image: key-sticker-sheets-app
     ports:
       - "3000:3000"
     volumes:

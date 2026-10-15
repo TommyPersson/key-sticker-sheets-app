@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# One run per branch at a time; builds on main queue up so version tags are handed out in order
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  client:
+    name: Client
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - name: Type check and build
+        run: npm run build
+      - name: Build Storybook
+        run: npm run build-storybook
+
+  server:
+    name: Server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - name: Syntax check
+        run: find src -name '*.js' -print0 | xargs -0 -n1 node --check
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t key-sticker-sheets-app:ci .
+      - name: Smoke test
+        run: |
+          docker run -d --name key-sticker-sheets-app -p 3000:3000 key-sticker-sheets-app:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs key-sticker-sheets-app
+          exit 1
+
+  version:
+    name: Tag version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [client, server, docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Tag the next version
+        run: |
+          # Versions are v1, v2, ...; the next one follows the highest existing tag
+          last=$(git tag --list 'v[0-9]*' | sed -n 's/^v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -1)
+          next="v$(( ${last:-0} + 1 ))"
+          if git tag --points-at HEAD | grep -qx 'v[0-9][0-9]*'; then
+            echo "HEAD is already tagged: $(git tag --points-at HEAD | tr '\n' ' ')"
+            exit 0
+          fi
+          git tag "$next" "$GITHUB_SHA"
+          git push origin "$next"
+          echo "Tagged $GITHUB_SHA as **$next**" >> "$GITHUB_STEP_SUMMARY"
