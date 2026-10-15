@@ -48,6 +48,7 @@ import { contentKey, parseImport, toSheetFile } from './importExport';
 import { defaultLayout } from './layouts';
 import { useWorkspace, type SaveStatus } from './useWorkspace';
 import type { IconInfo, LibrarySticker, Sheet, SheetItem, SheetSettings, SheetSummary, Sticker, StickerSize } from './types';
+import { uuid } from './uuid';
 
 const SHEETS_WIDTH = 260;
 /** Width a library card column takes: the card (see Library) plus the gap */
@@ -80,7 +81,7 @@ const EDITOR_GAP = 12;
 type Selection = { kind: 'item'; id: string } | { kind: 'sticker'; id: string } | null;
 
 const blankSticker = (size: StickerSize): Sticker => ({
-  id: crypto.randomUUID(),
+  id: uuid(),
   line1: '',
   line2: '',
   shortcut: '',
@@ -89,7 +90,7 @@ const blankSticker = (size: StickerSize): Sticker => ({
   size,
   layout: defaultLayout(size),
 });
-const newItem = (stickerId: string): SheetItem => ({ id: crypto.randomUUID(), stickerId });
+const newItem = (stickerId: string): SheetItem => ({ id: uuid(), stickerId });
 
 /** Library list from the server as an id → sticker map (dropping the usage info) */
 const toMap = (list: LibrarySticker[]): Record<string, Sticker> =>
@@ -347,7 +348,7 @@ export default function App() {
   /** Points the selected placement at a new copy of its sticker, so it can be edited separately */
   const makeCopy = () => {
     if (!selectedItem || !selectedSticker) return;
-    const copy = { ...selectedSticker, id: crypto.randomUUID(), createdAt: undefined, updatedAt: undefined };
+    const copy = { ...selectedSticker, id: uuid(), createdAt: undefined, updatedAt: undefined };
     edit((w) => ({
       stickers: { ...w.stickers, [copy.id]: copy },
       sheet: w.sheet && {
@@ -540,7 +541,7 @@ export default function App() {
       for (const content of imported.stickers) {
         let id = library.get(contentKey(content));
         if (!id) {
-          id = (await api.saveSticker({ ...content, id: crypto.randomUUID() })).id;
+          id = (await api.saveSticker({ ...content, id: uuid() })).id;
           library.set(contentKey(content), id);
           added++;
         }

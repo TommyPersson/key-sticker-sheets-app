@@ -5,6 +5,7 @@ import { PrintedPage, paginate } from './components/StickerSheet';
 import sheetCss from './components/sheet.css?raw';
 import { dimensionsOf, gridFor, paperSize } from './paper';
 import type { Sheet, Sticker } from './types';
+import { uuid } from './uuid';
 
 /*
  * Export of a sheet as an xTool Studio project (.xs) for print-then-cut on the M1 Ultra:
@@ -21,7 +22,6 @@ const KNIFE = { cutValue: 70, speed: 40, repeat: 2 };
 const LAYER = '#00befe';
 const CSS_PX_PER_MM = 96 / 25.4;
 
-const uuid = () => crypto.randomUUID();
 /** xTool's short random ids, e.g. "profile:48BuryU3bgQA" */
 const shortId = (prefix: string) => `${prefix}:${uuid().replace(/-/g, '').slice(0, 12)}`;
 const round = (n: number) => +n.toFixed(6);

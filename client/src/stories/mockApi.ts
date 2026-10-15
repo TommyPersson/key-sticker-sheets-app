@@ -1,6 +1,7 @@
 import { sheetSummary } from '../api';
 import { defaultDimensions, normalizeSize } from '../paper';
 import type { IconInfo, Sheet, SheetSettings, Sticker } from '../types';
+import { uuid } from '../uuid';
 
 /**
  * An in-memory stand-in for the server's /api, so the whole app runs in Storybook.
@@ -61,7 +62,7 @@ export function installMockApi(initial: MockData): () => void {
       if (!id && method === 'POST') {
         const input = body as Partial<Sheet>;
         const sheet: Sheet = {
-          id: crypto.randomUUID(),
+          id: uuid(),
           name: input.name || 'Untitled sheet',
           items: input.items ?? [],
           settings: normalizeSettings(input.settings),

@@ -5,6 +5,7 @@ import { Library } from '../components/Library';
 import { SIZES, defaultDimensions } from '../paper';
 import type { StickerSize } from '../types';
 import { byId, sampleStickers } from './fixtures';
+import { uuid } from '../uuid';
 
 interface Args {
   size: StickerSize;
@@ -33,7 +34,7 @@ function LibraryPane({ size, hasSheet, width }: Args) {
         onAddToSheet={() => {}}
         onMove={(id, category) => setStickers((list) => list.map((s) => (s.id === id ? { ...s, category } : s)))}
         onDuplicate={(id) => {
-          const copy = { ...stickers.find((s) => s.id === id)!, id: crypto.randomUUID() };
+          const copy = { ...stickers.find((s) => s.id === id)!, id: uuid() };
           setStickers((list) => [...list, copy]);
           setSelectedId(copy.id);
         }}

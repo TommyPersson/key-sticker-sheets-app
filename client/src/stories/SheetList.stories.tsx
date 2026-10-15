@@ -5,6 +5,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { FloatingPane } from '../components/FloatingPane';
 import { SheetList, SheetListActions } from '../components/SheetList';
 import type { SheetSummary, StickerSize } from '../types';
+import { uuid } from '../uuid';
 
 const SHEETS: SheetSummary[] = [
   { id: 'a', name: 'IntelliJ & system', stickerCount: 57, size: '1.5u', paper: 'A4', landscape: false },
@@ -20,7 +21,7 @@ function SheetsPane({ empty }: { empty: boolean }) {
   const [sheets, setSheets] = useState(empty ? [] : SHEETS);
   const [selectedId, setSelectedId] = useState<string | null>(sheets[0]?.id ?? null);
   const create = (size: StickerSize) => {
-    const sheet = { id: crypto.randomUUID(), name: 'New sheet', stickerCount: 0, size, paper: 'A4', landscape: false };
+    const sheet = { id: uuid(), name: 'New sheet', stickerCount: 0, size, paper: 'A4', landscape: false };
     setSheets((list) => [...list, sheet]);
     setSelectedId(sheet.id);
   };

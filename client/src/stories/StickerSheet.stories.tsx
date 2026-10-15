@@ -4,6 +4,7 @@ import { PrintedPage, StickerSheetEditor, paginate } from '../components/Sticker
 import type { Sheet, Sticker, StickerSize } from '../types';
 import { byId, sampleSheet, sampleStickers } from './fixtures';
 import { SIZES } from '../paper';
+import { uuid } from '../uuid';
 
 interface Args {
   size: StickerSize;
@@ -49,7 +50,7 @@ function Editor(args: Args) {
         })
       }
       onInsert={(stickerId, index) =>
-        setItems((items) => [...items.slice(0, index), { id: crypto.randomUUID(), stickerId }, ...items.slice(index)])
+        setItems((items) => [...items.slice(0, index), { id: uuid(), stickerId }, ...items.slice(index)])
       }
       onRemove={(id) => setItems((items) => items.filter((i) => i.id !== id))}
     />
