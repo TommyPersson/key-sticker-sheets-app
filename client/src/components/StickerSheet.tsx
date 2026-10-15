@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { createPortal } from 'react-dom';
 import CloseIcon from '@mui/icons-material/Close';
 import { iconUrl } from '../api';
 import { dimensionsOf, gridFor, mm, paperSize } from '../paper';
+import { layoutOf, type Anchor, type StickerComponent, type StickerLayout } from '../layouts';
 import type { Sheet, SheetDimensions, SheetItem, SheetSettings, Sticker } from '../types';
 import './sheet.css';
 
@@ -11,7 +12,7 @@ export const perPage = (settings: SheetSettings) => gridFor(settings).perPage;
 /** Drag data type used when dragging a sticker out of the library */
 export const LIBRARY_DRAG_TYPE = 'application/x-library-sticker';
 
-const MISSING: Sticker = { id: '', line1: '?', line2: 'MISSING', shortcut: '', icon: '', category: '' };
+const MISSING: Sticker = { id: '', line1: '?', line2: 'MISSING', shortcut: '', icon: '', category: '', size: '1.5u', layout: '' };
 
 export type Slot =
   | { kind: 'skipped' }
@@ -118,14 +119,66 @@ function PageInfo({ sheet, page, pageCount }: { sheet: Sheet; page: number; page
   );
 }
 
-export function StickerFace({ sticker, placeholder }: { sticker: Sticker; placeholder?: boolean }) {
+const ANCHOR_ALIGNMENT: Record<Anchor, [h: string, v: string]> = {
+  'top-left': ['start', 'start'],
+  top: ['center', 'start'],
+  'top-right': ['end', 'start'],
+  left: ['start', 'center'],
+  center: ['center', 'center'],
+  right: ['end', 'center'],
+  'bottom-left': ['start', 'end'],
+  bottom: ['center', 'end'],
+  'bottom-right': ['end', 'end'],
+};
+
+/** A sticker's printed content, arranged by its layout */
+export function StickerFace({
+  sticker,
+  placeholder,
+  layout = layoutOf(sticker),
+}: {
+  sticker: Sticker;
+  placeholder?: boolean;
+  /** Overrides the sticker's own layout, e.g. to preview another one */
+  layout?: StickerLayout;
+}) {
   const blank = !sticker.line1 && !sticker.line2 && !sticker.shortcut && !sticker.icon;
+  const line1 = blank && placeholder ? 'Empty' : sticker.line1;
+  // Layouts with a larger icon scale it to fit a square of that size
+  const iconStyle: React.CSSProperties | undefined = layout.iconSize
+    ? { width: `${layout.iconSize}mm`, height: `${layout.iconSize}mm`, maxWidth: 'none', maxHeight: 'none', objectFit: 'contain' }
+    : undefined;
+  const components: Record<StickerComponent, React.ReactNode> = {
+    // An empty first line keeps its height, so the second line stays in place
+    text: (line1 || sticker.line2) && (
+      <span className="ks-text">
+        <span className="ks-line1">{line1}</span>
+        {sticker.line2 && <span className="ks-line2">{sticker.line2}</span>}
+      </span>
+    ),
+    icon: sticker.icon && (
+      <img
+        className="ks-icon"
+        src={iconUrl(sticker.icon)}
+        alt=""
+        draggable={false}
+        style={iconStyle}
+      />
+    ),
+    shortcut: sticker.shortcut && <span className="ks-shortcut">{sticker.shortcut}</span>,
+  };
   return (
     <>
-      <span className="ks-line1">{blank && placeholder ? 'Empty' : sticker.line1}</span>
-      <span className="ks-line2">{sticker.line2}</span>
-      <span className="ks-shortcut">{sticker.shortcut}</span>
-      {sticker.icon && <img className="ks-icon" src={iconUrl(sticker.icon)} alt="" draggable={false} />}
+      {layout.areas.map((area) => {
+        const [h, v] = ANCHOR_ALIGNMENT[area.anchor];
+        return (
+          <div key={area.anchor} className={`ks-area${area.row ? ' row' : ''}`} data-h={h} data-v={v}>
+            {area.components.map((c) => (
+              <Fragment key={c}>{components[c]}</Fragment>
+            ))}
+          </div>
+        );
+      })}
     </>
   );
 }

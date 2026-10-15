@@ -19,7 +19,7 @@ import ArticleIcon from '@mui/icons-material/Article';
 import CropPortraitIcon from '@mui/icons-material/CropPortrait';
 import CropLandscapeIcon from '@mui/icons-material/CropLandscape';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { DEFAULT_DIMENSIONS, DIMENSION_LIMITS, PAPER_SIZES, dimensionsOf, gridFor } from '../paper';
+import { DIMENSION_LIMITS, PAPER_SIZES, defaultDimensions, dimensionsOf, gridFor, sizeLabel } from '../paper';
 import type { SheetDimensions, SheetSettings } from '../types';
 
 interface Props {
@@ -63,9 +63,8 @@ export function PageSetup({ settings, onChange }: Props) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const grid = gridFor(settings);
   const dimensions = dimensionsOf(settings);
-  const isDefault = (Object.keys(DEFAULT_DIMENSIONS) as (keyof SheetDimensions)[]).every(
-    (k) => dimensions[k] === DEFAULT_DIMENSIONS[k],
-  );
+  const defaults = defaultDimensions(settings.size);
+  const isDefault = (Object.keys(defaults) as (keyof SheetDimensions)[]).every((k) => dimensions[k] === defaults[k]);
 
   /** Paper and dimension changes alter the page capacity, so keep the skip offset within it */
   const setLayout = (patch: Partial<SheetSettings>, coalesceKey?: string) => {
@@ -104,7 +103,7 @@ export function PageSetup({ settings, onChange }: Props) {
         onClick={(e) => setAnchor(e.currentTarget)}
         sx={{ textTransform: 'none' }}
       >
-        {settings.paper} · {grid.columns}×{grid.rows}
+        {sizeLabel(settings.size)} · {settings.paper} · {grid.columns}×{grid.rows}
       </Button>
       {/* Also shown directly in the toolbar for quick switching */}
       {orientationToggle}
@@ -165,7 +164,7 @@ export function PageSetup({ settings, onChange }: Props) {
             size="small"
             startIcon={<RestartAltIcon />}
             disabled={isDefault}
-            onClick={() => setLayout({ dimensions: { ...DEFAULT_DIMENSIONS } })}
+            onClick={() => setLayout({ dimensions: defaults })}
             sx={{ alignSelf: 'flex-start' }}
           >
             Reset dimensions to defaults

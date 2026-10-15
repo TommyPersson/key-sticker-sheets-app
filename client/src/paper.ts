@@ -1,4 +1,4 @@
-import type { SheetDimensions, SheetSettings } from './types';
+import type { SheetDimensions, SheetSettings, StickerSize } from './types';
 
 export interface PaperSize {
   id: string;
@@ -20,7 +20,8 @@ export const DEFAULT_PAPER = 'A4';
 
 /**
  * Default geometry in mm, matching the PoC. The page margin approximates the browser's default
- * print margin that the PoC relied on. Keep in sync with DEFAULT_DIMENSIONS in server/src/storage.js.
+ * print margin that the PoC relied on. The sticker width is the 1.5U one, see defaultDimensions.
+ * Keep in sync with DIMENSIONS and SIZE_WIDTHS in server/src/storage.js.
  */
 export const DEFAULT_DIMENSIONS: SheetDimensions = {
   cellWidth: 26,
@@ -32,6 +33,19 @@ export const DEFAULT_DIMENSIONS: SheetDimensions = {
   markerInset: 5,
   markerSize: 10,
 };
+
+export const SIZES: { id: StickerSize; label: string; width: number }[] = [
+  { id: '1.5u', label: '1.5U', width: 26 },
+  { id: '1u', label: '1U', width: 17 },
+];
+
+/** Default geometry for a sheet of one size: the stickers get the size's width */
+export const defaultDimensions = (size: StickerSize): SheetDimensions => ({
+  ...DEFAULT_DIMENSIONS,
+  cellWidth: SIZES.find((s) => s.id === size)?.width ?? DEFAULT_DIMENSIONS.cellWidth,
+});
+
+export const sizeLabel = (size: StickerSize) => SIZES.find((s) => s.id === size)?.label ?? size;
 
 /** Allowed range for each dimension, in mm */
 export const DIMENSION_LIMITS: Record<keyof SheetDimensions, { min: number; max: number }> = {
@@ -46,7 +60,7 @@ export const DIMENSION_LIMITS: Record<keyof SheetDimensions, { min: number; max:
 };
 
 export const dimensionsOf = (settings: SheetSettings): SheetDimensions => ({
-  ...DEFAULT_DIMENSIONS,
+  ...defaultDimensions(settings.size),
   ...settings.dimensions,
 });
 

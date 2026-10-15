@@ -73,35 +73,57 @@
   border-color: #000;
 }
 
+/*
+ * Sticker layout: the layout places each component (text block, icon, shortcut) in one of
+ * nine anchor areas inside a 2 mm padding. Components sharing an area are stacked.
+ */
+.ks-area {
+  position: absolute;
+  inset: 2mm;
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+}
+
+.ks-area.row {
+  flex-direction: row;
+  gap: 1.5mm;
+}
+
+/* Column areas: the main axis is vertical */
+.ks-area[data-v='start'] { justify-content: flex-start; }
+.ks-area[data-v='center'] { justify-content: center; }
+.ks-area[data-v='end'] { justify-content: flex-end; }
+.ks-area[data-h='start'] { align-items: flex-start; text-align: left; }
+.ks-area[data-h='center'] { align-items: center; text-align: center; }
+.ks-area[data-h='end'] { align-items: flex-end; text-align: right; }
+
+/* Row areas: the main axis is horizontal */
+.ks-area.row[data-h='start'] { justify-content: flex-start; }
+.ks-area.row[data-h='center'] { justify-content: center; }
+.ks-area.row[data-h='end'] { justify-content: flex-end; }
+.ks-area.row[data-v='start'] { align-items: flex-start; }
+.ks-area.row[data-v='center'] { align-items: center; }
+.ks-area.row[data-v='end'] { align-items: flex-end; }
+
 .ks-line1,
 .ks-line2 {
+  display: block;
   font-size: 8pt;
   font-weight: bold;
-  position: absolute;
-  left: 2mm;
+  line-height: 3.5mm;
+  min-height: 3.5mm;
   white-space: nowrap;
-}
-
-.ks-line1 {
-  top: 2mm;
-}
-
-.ks-line2 {
-  top: 5.5mm;
 }
 
 .ks-shortcut {
   font-size: 7pt;
-  position: absolute;
-  bottom: 2mm;
-  left: 2mm;
   white-space: nowrap;
 }
 
 .ks-icon {
-  position: absolute;
-  right: 2mm;
-  top: 2mm;
+  display: block;
+  flex-shrink: 0;
   max-width: 16px;
   max-height: 16px;
 }

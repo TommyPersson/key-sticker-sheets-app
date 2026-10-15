@@ -10,6 +10,7 @@ import type { SheetDimensions, Sticker } from '../types';
 type Filter = 'all' | 'onSheet' | 'notOnSheet' | 'unused';
 
 interface Props {
+  /** The stickers of the shown size's library */
   stickers: Record<string, Sticker>;
   dimensions: SheetDimensions;
   /** Number of placements of each sticker on the open sheet */
@@ -25,6 +26,8 @@ interface Props {
 
 const PX_PER_MM = 96 / 25.4;
 const CARD_WIDTH = 112;
+/** A card's 4px padding and 1px border on each side */
+const CARD_FRAME = 10;
 
 const searchText = (s: Sticker) => `${s.line1} ${s.line2} ${s.shortcut} ${s.icon} ${s.category}`.toLowerCase();
 
@@ -104,7 +107,9 @@ export function Library({
     return [...byCategory].filter(([, members]) => members.length > 0);
   }, [list, categories]);
 
-  const zoom = Math.min(1, (CARD_WIDTH - 8) / (dimensions.cellWidth * PX_PER_MM));
+  // The sticker fills the card's width, and the card has the sticker's proportions
+  const zoom = (CARD_WIDTH - CARD_FRAME) / (dimensions.cellWidth * PX_PER_MM);
+  const cardHeight = dimensions.cellHeight * PX_PER_MM * zoom + CARD_FRAME;
   const filters: [Filter, string][] = [
     ['all', 'All'],
     ...(hasSheet
@@ -234,6 +239,8 @@ export function Library({
                     position: 'relative',
                     display: 'grid',
                     placeItems: 'center',
+                    // An explicit height: grid rows don't account for aspect-ratio, so cards would overlap
+                    height: cardHeight,
                     p: 0.5,
                     borderRadius: 1,
                     border: 1,

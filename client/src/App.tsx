@@ -24,7 +24,6 @@ import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
@@ -33,7 +32,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import { api } from './api';
-import { SheetList } from './components/SheetList';
+import { NewSheetButton, SheetList } from './components/SheetList';
 import { Library, categoriesOf } from './components/Library';
 import { FloatingColumn, FloatingPane, paneClearance } from './components/FloatingPane';
 import { StickerEditor } from './components/StickerEditor';
@@ -41,10 +40,11 @@ import { SheetPlacement, type PlacementActions } from './components/SheetPlaceme
 import { IconPicker } from './components/IconPicker';
 import { StickerSheetEditor, StickerSheetPrint, perPage } from './components/StickerSheet';
 import { PageSetup } from './components/PageSetup';
-import { DEFAULT_DIMENSIONS, dimensionsOf, gridFor } from './paper';
+import { defaultDimensions, dimensionsOf, gridFor, sizeLabel } from './paper';
 import { contentKey, parseImport, toSheetFile } from './importExport';
+import { defaultLayout } from './layouts';
 import { useWorkspace, type SaveStatus } from './useWorkspace';
-import type { IconInfo, LibrarySticker, Sheet, SheetItem, SheetSummary, Sticker } from './types';
+import type { IconInfo, LibrarySticker, Sheet, SheetItem, SheetSettings, SheetSummary, Sticker, StickerSize } from './types';
 
 const SHEETS_WIDTH = 260;
 /** Width a library card column takes: the card (see Library) plus the gap */
@@ -59,7 +59,16 @@ const EDITOR_GAP = 12;
 /** A sticker placed on the open sheet, or a sticker picked in the library */
 type Selection = { kind: 'item'; id: string } | { kind: 'sticker'; id: string } | null;
 
-const blankSticker = (): Sticker => ({ id: crypto.randomUUID(), line1: '', line2: '', shortcut: '', icon: '', category: '' });
+const blankSticker = (size: StickerSize): Sticker => ({
+  id: crypto.randomUUID(),
+  line1: '',
+  line2: '',
+  shortcut: '',
+  icon: '',
+  category: '',
+  size,
+  layout: defaultLayout(size),
+});
 const newItem = (stickerId: string): SheetItem => ({ id: crypto.randomUUID(), stickerId });
 
 /** Library list from the server as an id → sticker map (dropping the usage info) */
@@ -101,6 +110,10 @@ export default function App() {
     return n >= LIBRARY_COLUMNS.min && n <= LIBRARY_COLUMNS.max ? n : LIBRARY_COLUMNS.default;
   });
   const libraryPaneWidth = libraryWidth(libraryColumns);
+  /** Size of the last open sheet, whose library stays shown while no sheet is open */
+  const [lastSize, setLastSize] = useState<StickerSize>(() =>
+    stored<string>('ks-library-size', '1.5u') === '1u' ? '1u' : '1.5u',
+  );
   const [zoom, setZoom] = useState(() => Number(stored('ks-zoom', '1.25')) || 1.25);
   const [message, setMessage] = useState<{ text: string; severity: 'error' | 'success' } | null>(null);
 
@@ -110,7 +123,13 @@ export default function App() {
       (list) =>
         list?.map((s) =>
           s.id === saved.id
-            ? { id: saved.id, name: saved.name, stickerCount: saved.items.length, updatedAt: saved.updatedAt }
+            ? {
+                id: saved.id,
+                name: saved.name,
+                stickerCount: saved.items.length,
+                size: saved.settings.size,
+                updatedAt: saved.updatedAt,
+              }
             : s,
         ) ?? null,
     );
@@ -120,6 +139,10 @@ export default function App() {
 
   useEffect(() => store('ks-zoom', String(zoom)), [zoom]);
   useEffect(() => store('ks-library-columns', String(libraryColumns)), [libraryColumns]);
+  useEffect(() => {
+    if (sheet) setLastSize(sheet.settings.size);
+  }, [sheet]);
+  useEffect(() => store('ks-library-size', lastSize), [lastSize]);
 
   // ---------- Loading ----------
 
@@ -198,7 +221,13 @@ export default function App() {
   // ---------- Derived state ----------
 
   const items = sheet?.items ?? [];
-  const dimensions = sheet ? dimensionsOf(sheet.settings) : DEFAULT_DIMENSIONS;
+  // Each size has its own library; an open sheet shows the library of its size
+  const librarySize = sheet?.settings.size ?? lastSize;
+  const libraryStickers = useMemo(
+    () => Object.fromEntries(Object.entries(stickers).filter(([, s]) => s.size === librarySize)),
+    [stickers, librarySize],
+  );
+  const dimensions = sheet ? dimensionsOf(sheet.settings) : defaultDimensions(librarySize);
 
   const iconUsage = (path: string) => Object.values(stickers).filter((s) => s.icon === path).length;
   const onSheet = useMemo(() => {
@@ -241,7 +270,7 @@ export default function App() {
 
   /** Creates a sticker in the library and, when a position is given, places it on the sheet (one undo step) */
   const createSticker = (at?: number, content: Partial<Sticker> = {}) => {
-    const sticker = { ...blankSticker(), ...content };
+    const sticker = { ...blankSticker(librarySize), ...content };
     const item = newItem(sticker.id);
     edit((w) => ({
       stickers: { ...w.stickers, [sticker.id]: sticker },
@@ -368,7 +397,7 @@ export default function App() {
 
   // ---------- Sheet operations ----------
 
-  const createSheet = async (input: Partial<Sheet> = { name: 'New sheet', items: [] }) => {
+  const createSheet = async (input: Partial<Sheet>) => {
     try {
       const created = await api.createSheet(input);
       await refreshSheets();
@@ -376,6 +405,52 @@ export default function App() {
       return created;
     } catch (e) {
       showError(`Could not create sheet: ${(e as Error).message}`);
+    }
+  };
+
+  /** The server fills in the default settings for the size */
+  const createEmptySheet = (size: StickerSize) =>
+    createSheet({ name: 'New sheet', items: [], settings: { size } as SheetSettings });
+
+  /**
+   * Changes a sheet's key size, and the sticker width with it. Its stickers belong to the old size's
+   * library, so a non-empty sheet is cleared, after a warning.
+   */
+  const changeSheetSize = async (id: string, size: StickerSize) => {
+    const open = id === sheet?.id;
+    const summary = sheets?.find((s) => s.id === id);
+    const count = open ? items.length : (summary?.stickerCount ?? 0);
+    if (
+      count > 0 &&
+      !confirm(
+        `Change "${summary?.name}" to ${sizeLabel(size)}? A sheet holds stickers of one size, so its ${count} ` +
+          `sticker${count === 1 ? '' : 's'} will be removed from the sheet. They stay in the ` +
+          `${sizeLabel(summary?.size ?? sheet!.settings.size)} library.`,
+      )
+    ) {
+      return;
+    }
+    const resize = (s: Sheet): Sheet => {
+      const settings = {
+        ...s.settings,
+        size,
+        dimensions: { ...dimensionsOf(s.settings), cellWidth: defaultDimensions(size).cellWidth },
+      };
+      return { ...s, items: [], settings: { ...settings, skip: Math.min(settings.skip, perPage(settings) - 1) } };
+    };
+    if (open) {
+      // An edit like any other, so it can be undone
+      edit((w) => (w.sheet ? { ...w, sheet: resize(w.sheet) } : w));
+      setSelection(null);
+      return;
+    }
+    try {
+      await ws.flush();
+      await api.updateSheet(resize(await api.getSheet(id)));
+      await refreshSheets();
+      await refreshLibrary();
+    } catch (e) {
+      showError(`Could not change the sheet size: ${(e as Error).message}`);
     }
   };
 
@@ -644,9 +719,7 @@ export default function App() {
                 {sheets?.length === 0 ? (
                   <Stack spacing={2} sx={{ alignItems: 'center' }}>
                     <Typography>Create your first sticker sheet to get started.</Typography>
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => createSheet()}>
-                      New sheet
-                    </Button>
+                    <NewSheetButton onCreate={createEmptySheet} />
                   </Stack>
                 ) : (
                   sheets && <Typography>Select a sheet.</Typography>
@@ -670,16 +743,17 @@ export default function App() {
                   sheets={sheets}
                   selectedId={sheet?.id ?? null}
                   onSelect={openSheet}
-                  onCreate={() => createSheet()}
+                  onCreate={createEmptySheet}
                   onImport={importSheet}
                   onDuplicate={duplicateSheet}
                   onExport={exportSheet}
                   onDelete={deleteSheet}
+                  onChangeSize={changeSheetSize}
                 />
               )}
             </FloatingPane>
             <FloatingPane
-              title={`Library (${Object.keys(stickers).length})`}
+              title={`Library · ${sizeLabel(librarySize)} (${Object.keys(libraryStickers).length})`}
               icon={<CollectionsBookmarkIcon />}
               side="right"
               width={libraryPaneWidth}
@@ -701,7 +775,7 @@ export default function App() {
               }
             >
               <Library
-                stickers={stickers}
+                stickers={libraryStickers}
                 dimensions={dimensions}
                 onSheet={onSheet}
                 sheetCount={sheetCount}
@@ -744,10 +818,11 @@ export default function App() {
                     <StickerEditor
                       key={selectedSticker.id}
                       sticker={selectedSticker}
-                      dimensions={dimensions}
+                      // A library sticker of another size than the open sheet previews at its own size
+                      dimensions={selectedSticker.size === librarySize ? dimensions : defaultDimensions(selectedSticker.size)}
                       usedOn={usedOnIds(selectedSticker.id).map(sheetName)}
                       categories={categoriesOf(
-                        Object.fromEntries(Object.entries(stickers).filter(([id]) => id !== selectedSticker.id)),
+                        Object.fromEntries(Object.entries(libraryStickers).filter(([id]) => id !== selectedSticker.id)),
                       )}
                       onChange={(patch) =>
                         updateSticker(selectedSticker.id, patch, `${selectedSticker.id}:${Object.keys(patch).join()}`)

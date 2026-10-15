@@ -1,11 +1,14 @@
 import { useLayoutEffect, useRef } from 'react';
-import { Alert, Autocomplete, Box, Button, Divider, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Autocomplete, Box, Button, ButtonBase, Divider, Stack, TextField, Typography } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import { StickerFace, sheetCssVars } from './StickerSheet';
+import { layoutOf, layoutsFor } from '../layouts';
+import { sizeLabel } from '../paper';
 import type { SheetDimensions, Sticker } from '../types';
 
 interface Props {
   sticker: Sticker;
+  /** Geometry of a sheet of the sticker's size */
   dimensions: SheetDimensions;
   /** Names of the sheets that use this sticker */
   usedOn: string[];
@@ -18,6 +21,11 @@ interface Props {
 const PX_PER_MM = 96 / 25.4;
 /** Widest the preview may get inside the side panel, in px */
 const PREVIEW_MAX_WIDTH = 290;
+const LAYOUT_COLUMNS = 3;
+const LAYOUT_GAP = 8;
+
+/** Shown in the layout thumbnails while the sticker has no content */
+const SAMPLE: Pick<Sticker, 'line1' | 'line2' | 'shortcut'> = { line1: 'Line 1', line2: 'Line 2', shortcut: 'Shortcut' };
 
 /** Edits a library sticker. Changes apply wherever the sticker is placed. */
 export function StickerEditor({ sticker, dimensions, usedOn, categories, onChange, onChooseIcon }: Props) {
@@ -30,6 +38,13 @@ export function StickerEditor({ sticker, dimensions, usedOn, categories, onChang
   }, [sticker.category]);
 
   const previewZoom = Math.min(2, PREVIEW_MAX_WIDTH / (dimensions.cellWidth * PX_PER_MM));
+  const thumbWidth = (PREVIEW_MAX_WIDTH - (LAYOUT_COLUMNS - 1) * LAYOUT_GAP) / LAYOUT_COLUMNS;
+  // Layout thumbnails fill their column; the frame adds 2px padding and a 2px border on each side
+  const THUMB_FRAME = 8;
+  const thumbZoom = (thumbWidth - THUMB_FRAME) / (dimensions.cellWidth * PX_PER_MM);
+  const thumbHeight = dimensions.cellHeight * PX_PER_MM * thumbZoom + THUMB_FRAME;
+  const blank = !sticker.line1 && !sticker.line2 && !sticker.shortcut && !sticker.icon;
+  const current = layoutOf(sticker);
   const field = (key: 'line1' | 'line2' | 'shortcut', label: string) => (
     <TextField
       label={label}
@@ -129,6 +144,49 @@ export function StickerEditor({ sticker, dimensions, usedOn, categories, onChang
           {sticker.icon}
         </Typography>
       )}
+
+      <Box>
+        <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 0.5 }}>
+          {sizeLabel(sticker.size)} layout: {current.name}
+        </Typography>
+        <Box
+          role="radiogroup"
+          aria-label="Layout"
+          sx={{ display: 'grid', gridTemplateColumns: `repeat(${LAYOUT_COLUMNS}, 1fr)`, gap: `${LAYOUT_GAP}px` }}
+        >
+          {layoutsFor(sticker.size).map((layout) => {
+            const selected = layout.id === current.id;
+            return (
+              <ButtonBase
+                key={layout.id}
+                role="radio"
+                aria-checked={selected}
+                title={layout.name}
+                onClick={() => onChange({ layout: layout.id })}
+                sx={{
+                  p: '2px',
+                  border: 2,
+                  // The frame has the sticker's proportions (an explicit height, since grid rows ignore aspect-ratio)
+                  height: thumbHeight,
+                  borderRadius: 1,
+                  borderColor: selected ? 'primary.main' : 'divider',
+                  bgcolor: '#fff',
+                  justifyContent: 'center',
+                  '&:hover': { borderColor: selected ? 'primary.main' : 'primary.light' },
+                }}
+              >
+                <Box sx={{ zoom: thumbZoom, color: '#000', pointerEvents: 'none' }}>
+                  <div className="ks-page" style={sheetCssVars(dimensions)}>
+                    <div className="ks-item">
+                      <StickerFace sticker={blank ? { ...sticker, ...SAMPLE } : sticker} layout={layout} />
+                    </div>
+                  </div>
+                </Box>
+              </ButtonBase>
+            );
+          })}
+        </Box>
+      </Box>
 
       <Divider />
 

@@ -1,3 +1,6 @@
+/** Key size a sticker is made for. Each size has its own library, and a sheet holds one size. */
+export type StickerSize = '1u' | '1.5u';
+
 /** A sticker in the global library */
 export interface Sticker {
   id: string;
@@ -8,6 +11,10 @@ export interface Sticker {
   icon: string;
   /** Free-text grouping used to filter the library, e.g. "Debugging". Empty for none. */
   category: string;
+  /** The size library the sticker belongs to */
+  size: StickerSize;
+  /** Layout id, see layouts.ts. Ids that are unknown or for another size fall back to the size's default. */
+  layout: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -24,6 +31,8 @@ export interface SheetItem {
 }
 
 export interface SheetSettings {
+  /** Key size of every sticker on the sheet; the default sticker width follows it */
+  size: StickerSize;
   /** Number of sticker slots to leave empty at the start of the first page (partially used paper). */
   skip: number;
   /** Print thin outlines around each sticker. */
@@ -65,6 +74,7 @@ export interface SheetSummary {
   id: string;
   name: string;
   stickerCount: number;
+  size: StickerSize;
   updatedAt?: string;
 }
 

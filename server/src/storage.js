@@ -172,7 +172,7 @@ export class Storage {
   async listSheets() {
     const sheets = await this.readAllSheets();
     return sheets
-      .map((s) => ({ id: s.id, name: s.name, stickerCount: s.items.length, updatedAt: s.updatedAt }))
+      .map((s) => ({ id: s.id, name: s.name, stickerCount: s.items.length, size: s.settings.size, updatedAt: s.updatedAt }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -363,9 +363,19 @@ function normalizeSticker(input) {
     shortcut: str(input?.shortcut),
     icon: str(input?.icon, 300),
     category: str(input?.category, 60).trim(),
+    ...sizeAndLayout(input),
     createdAt: str(input?.createdAt, 40) || undefined,
     updatedAt: str(input?.updatedAt, 40) || undefined,
   };
+}
+
+const SIZES = new Set(['1.5u', '1u']);
+const normalizeSize = (size) => (SIZES.has(size) ? size : '1.5u');
+
+/** The size library a sticker belongs to, and its layout id (the client knows the layouts and falls back to the size's default) */
+function sizeAndLayout(input) {
+  const size = normalizeSize(input?.size);
+  return { size, layout: str(input?.layout, 64).trim() || (size === '1u' ? '1u-classic' : 'classic') };
 }
 
 const contentKey = (s) => JSON.stringify([s.line1, s.line2, s.shortcut, s.icon]);
@@ -405,9 +415,13 @@ const DIMENSIONS = {
   markerSize: [10, 0, 50],
 };
 
-function normalizeDimensions(input) {
+// Default sticker width per size, keep in sync with SIZES in client/src/paper.ts
+const SIZE_WIDTHS = { '1.5u': 26, '1u': 17 };
+
+function normalizeDimensions(input, size) {
   const dimensions = {};
-  for (const [key, [fallback, min, max]] of Object.entries(DIMENSIONS)) {
+  for (const [key, [defaultValue, min, max]] of Object.entries(DIMENSIONS)) {
+    const fallback = key === 'cellWidth' ? SIZE_WIDTHS[size] : defaultValue;
     const n = Number(input?.[key]);
     dimensions[key] = Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n * 100) / 100)) : fallback;
   }
@@ -415,8 +429,10 @@ function normalizeDimensions(input) {
 }
 
 function normalizeSettings(settings) {
+  const size = normalizeSize(settings.size);
   return {
-    dimensions: normalizeDimensions(settings.dimensions),
+    size,
+    dimensions: normalizeDimensions(settings.dimensions, size),
     paper: PAPER_SIZES.has(settings.paper) ? settings.paper : 'A4',
     landscape: Boolean(settings.landscape),
     // The page capacity depends on the paper and is enforced by the client
