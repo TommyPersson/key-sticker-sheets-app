@@ -3,3 +3,4 @@
 server/data
 server/public
 **/*.tsbuildinfo
+**/storybook-static

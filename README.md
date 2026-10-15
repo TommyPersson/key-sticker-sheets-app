@@ -35,6 +35,18 @@ npm run dev                # backend on :3000, Vite on :5173 (proxies /api and /
 
 During development, data is stored in `server/data`.
 
+### Storybook
+
+Component stories, for checking visuals without the app or the server:
+
+```bash
+cd client
+npm run storybook          # http://localhost:6006
+npm run build-storybook    # static build in client/storybook-static
+```
+
+Stories live in `client/src/stories`: every sticker layout per size (with editable content and edge cases), the sheet editor (interactive: select, swap, move, remove) and printed page, and the library, sticker editor, sheet list and page setup panels. Sample data is in `fixtures.ts`; icons are served from `server/seed/icons`.
+
 ## Features
 
 - The sheet list and the sticker library are panels floating over the left and right of the workspace. Drag the library's left edge to widen or narrow it, one card column at a time (2–8 columns, remembered). Selecting a sticker opens its editor in a floating panel next to the library; close it with ✕ or Esc.
